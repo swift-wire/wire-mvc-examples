@@ -1,0 +1,100 @@
+name: build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# Each runtime is its own Swift package (isolated dependency tree), so CI runs a matrix over
+# the packages, each built/linted in its own directory. The shared `Controllers` package comes
+# in via a path dependency.
+jobs:
+  Build:
+    name: ${{ matrix.package }} / Linux
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [Controllers, HummingbirdExample]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: SwiftyLab/setup-swift@v1
+        with:
+          swift-version: "6.3.3"
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev curl unzip
+      - name: Build
+        working-directory: ${{ matrix.package }}
+        run: swift build -c release -Xswiftc -strict-concurrency=complete
+      - name: Build (verbose, for SwiftLint)
+        working-directory: ${{ matrix.package }}
+        run: swift build -v > build.log 2>&1
+      - name: Install SwiftLint
+        run: |
+          curl -sL https://github.com/realm/SwiftLint/releases/download/0.63.2/swiftlint_linux_amd64.zip -o swiftlint.zip
+          unzip -o swiftlint.zip -d /usr/local/bin
+          chmod +x /usr/local/bin/swiftlint
+      - name: SwiftLint unused imports
+        working-directory: ${{ matrix.package }}
+        run: swiftlint analyze --strict --quiet --compiler-log-path build.log
+
+  EndToEnd:
+    name: End-to-end / ${{ matrix.example }}
+    strategy:
+      fail-fast: false
+      matrix:
+        example: [HummingbirdExample]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: SwiftyLab/setup-swift@v1
+        with:
+          swift-version: "6.3.3"
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
+      - name: Run
+        # Bootstraps the graph (collating the shared Controllers package across the package
+        # boundary), applies the WireMVC controllers onto the runtime's router alongside a
+        # native route, and drives every route in-process. Prints "OK" or exits non-zero.
+        working-directory: ${{ matrix.example }}
+        run: swift run ${{ matrix.example }}
+
+  SwiftFormat:
+    name: swift-format / ${{ matrix.package }}
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [Controllers, HummingbirdExample]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: SwiftyLab/setup-swift@v1
+        with:
+          swift-version: "6.3.3"
+      - name: Run swift-format
+        working-directory: ${{ matrix.package }}
+        run: swift-format format --recursive --in-place .
+      - name: Check for formatting differences
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git diff --exit-code
+
+  SwiftLint:
+    name: SwiftLint 0.63.2 / ${{ matrix.package }}
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [Controllers, HummingbirdExample]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install SwiftLint
+        # The prebuilt Linux binary needs the GLIBC on ubuntu-24.04+.
+        run: |
+          curl -sL https://github.com/realm/SwiftLint/releases/download/0.63.2/swiftlint_linux_amd64.zip -o swiftlint.zip
+          unzip -o swiftlint.zip -d /usr/local/bin
+          chmod +x /usr/local/bin/swiftlint
+      - name: SwiftLint
+        working-directory: ${{ matrix.package }}
+        run: swiftlint lint --quiet
