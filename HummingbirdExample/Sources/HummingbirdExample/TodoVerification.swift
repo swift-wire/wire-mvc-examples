@@ -2,6 +2,7 @@ import Controllers
 import HTTPTypes
 import Hummingbird
 import HummingbirdTesting
+import Wire  // WiringModel (for the /wiring check)
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -66,6 +67,15 @@ func verifyTodos(_ app: some ApplicationProtocol) async throws {
 
         let empty = try await client.execute(uri: "/todos", method: .get)
         check(try decode([Todo].self, empty).isEmpty, "GET /todos  → empty after delete")
+
+        // WireMVC.mountIntrospection — the graph's wiring model, served cross-runtime (here on
+        // Hummingbird, with no Hummingbird-specific introspection code).
+        let wiring = try await client.execute(uri: "/wiring", method: .get)
+        let model = try decode(WiringModel.self, wiring)
+        check(
+            wiring.status == .ok && model.bindings.contains { $0.type.contains("TodosController") },
+            "GET /wiring  → 200, WiringModel lists the collated TodosController"
+        )
 
         if failed { throw ExampleFailed() }
     }

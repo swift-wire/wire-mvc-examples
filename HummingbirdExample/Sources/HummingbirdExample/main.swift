@@ -18,6 +18,9 @@ let router = Router()
 router.get("health") { _, _ in "OK" }
 // The WireMVC controllers, applied onto the router (a ServerTransport via OpenAPIHummingbird).
 try WireMVC.apply(graph, to: router)
+// The graph's wiring model, served over the same transport — a cross-runtime introspection
+// endpoint (no Hummingbird-specific code).
+try WireMVC.mountIntrospection(for: graph, on: router)
 
 let app = Application(router: router)
 try await verifyTodos(app)
