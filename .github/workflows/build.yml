@@ -23,7 +23,7 @@ jobs:
         with:
           swift-version: "6.3.3"
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev curl unzip
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev libsqlite3-dev curl unzip
       - name: Build
         working-directory: ${{ matrix.package }}
         run: swift build -c release -Xswiftc -strict-concurrency=complete
@@ -52,7 +52,7 @@ jobs:
         with:
           swift-version: "6.3.3"
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev libsqlite3-dev
       - name: Run
         # Bootstraps the graph (collating the shared Controllers package across the package
         # boundary), applies the WireMVC controllers onto the runtime's router alongside a
