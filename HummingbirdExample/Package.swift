@@ -14,6 +14,7 @@ let package = Package(
         .package(url: "https://github.com/tachyonics/swift-wire.git", branch: "main"),
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0"),
         .package(url: "https://github.com/swift-server/swift-openapi-hummingbird.git", from: "2.0.0"),
+        .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.0.0"),
     ],
     targets: [
         .executableTarget(
@@ -25,6 +26,7 @@ let package = Package(
                 .product(name: "Hummingbird", package: "hummingbird"),
                 .product(name: "HummingbirdTesting", package: "hummingbird"),
                 .product(name: "OpenAPIHummingbird", package: "swift-openapi-hummingbird"),
+                .product(name: "GRDB", package: "GRDB.swift"),
             ],
             plugins: [.plugin(name: "WireBuildPlugin", package: "swift-wire")]
         )

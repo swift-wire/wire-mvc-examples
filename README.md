@@ -29,8 +29,8 @@ re-implementation.
 - **Cross-module DI.** `TodosController` depends on a `TodoRepository` protocol declared in
   `Controllers` but *not* satisfied there; each runtime binds its own
   `@Singleton(as: TodoRepository.self)` backend. So each graph proves a library declares a need
-  and the app satisfies it across a package boundary. (`Hummingbird` → in-memory; other runtimes
-  → other backends.)
+  and the app satisfies it across a package boundary. (`Hummingbird` → an embedded SQLite
+  database via GRDB; other runtimes → other backends.)
 - **The persistence axis collapses to one binding.** The six `hummingbird-examples/todos-*`
   differ mainly in their database (DynamoDB / Fluent / Postgres / …). Here that's a single
   `@Singleton(as: TodoRepository.self)` swap — the heavyweight backends are absent only because
