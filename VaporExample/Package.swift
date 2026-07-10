@@ -1,0 +1,56 @@
+// swift-tools-version: 6.3
+import PackageDescription
+
+// Runtime 2: Vapor — its own package, so Vapor's dependency tree is isolated from Hummingbird's.
+// The shared controllers arrive via the ../Controllers path dependency (identical source); only
+// the transport (Vapor's `ServerTransport` via swift-openapi-vapor) and the bound backend differ.
+//
+// Structured like a real Vapor app: the `VaporExample` executable target holds the app assembly
+// (`configure`) plus a thin serving `@main`, and `VaporExampleTests` drives the routes with
+// VaporTesting — Vapor's testing tools (and swift-testing/XCTest) only link into test targets, so
+// route verification lives there, not in `main`. This is how `vapor new` scaffolds a project.
+let package = Package(
+    name: "VaporExample",
+    platforms: [.macOS(.v15)],
+    dependencies: [
+        .package(path: "../Controllers"),
+        .package(url: "https://github.com/tachyonics/wire-mvc.git", branch: "main"),
+        .package(url: "https://github.com/tachyonics/swift-wire.git", branch: "main"),
+        .package(url: "https://github.com/vapor/vapor.git", from: "4.106.0"),
+        .package(url: "https://github.com/swift-server/swift-openapi-vapor.git", from: "1.0.0"),
+        .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.21.0"),
+        .package(url: "https://github.com/tachyonics/swift-local-containers.git", from: "0.10.0"),
+        .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0"),
+    ],
+    targets: [
+        .executableTarget(
+            name: "VaporExample",
+            dependencies: [
+                .product(name: "Controllers", package: "Controllers"),
+                .product(name: "WireMVC", package: "wire-mvc"),
+                .product(name: "Wire", package: "swift-wire"),
+                .product(name: "Vapor", package: "vapor"),
+                .product(name: "OpenAPIVapor", package: "swift-openapi-vapor"),
+                .product(name: "PostgresNIO", package: "postgres-nio"),
+                .product(name: "Configuration", package: "swift-configuration"),
+            ],
+            plugins: [.plugin(name: "WireBuildPlugin", package: "swift-wire")]
+        ),
+        // The integration test provisions a throwaway Postgres via swift-local-containers'
+        // test-support macros (`@Containers`/`@Container` + `containerTrait`), then drives the
+        // routes with VaporTesting — the container is a test concern, not the app's.
+        .testTarget(
+            name: "VaporExampleTests",
+            dependencies: [
+                "VaporExample",
+                .product(name: "VaporTesting", package: "vapor"),
+                .product(name: "Controllers", package: "Controllers"),
+                .product(name: "Wire", package: "swift-wire"),
+                .product(name: "ContainerMacrosLib", package: "swift-local-containers"),
+                .product(name: "ContainerTestSupport", package: "swift-local-containers"),
+                .product(name: "DockerRuntime", package: "swift-local-containers"),
+                .product(name: "LocalContainers", package: "swift-local-containers"),
+            ]
+        ),
+    ]
+)

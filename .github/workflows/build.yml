@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [Controllers, HummingbirdExample]
+        package: [Controllers, HummingbirdExample, VaporExample]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -44,7 +44,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        example: [HummingbirdExample]
+        include:
+          # Hummingbird self-verifies in its executable (its test client isn't tied to a test
+          # framework), so `swift run` drives every route in-process.
+          - example: HummingbirdExample
+            verify: swift run HummingbirdExample
+          # Vapor's testing tools only link into test targets, so verification lives in
+          # `swift test`, which provisions a throwaway Postgres via swift-local-containers
+          # (Docker is preinstalled on the runner).
+          - example: VaporExample
+            verify: swift test
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -55,17 +64,17 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libssl-dev libsqlite3-dev
       - name: Run
         # Bootstraps the graph (collating the shared Controllers package across the package
-        # boundary), applies the WireMVC controllers onto the runtime's router alongside a
-        # native route, and drives every route in-process. Prints "OK" or exits non-zero.
+        # boundary), applies the WireMVC controllers onto the runtime's transport alongside a
+        # native route, and drives every route. Prints "OK" / passes, or exits non-zero.
         working-directory: ${{ matrix.example }}
-        run: swift run ${{ matrix.example }}
+        run: ${{ matrix.verify }}
 
   SwiftFormat:
     name: swift-format / ${{ matrix.package }}
     strategy:
       fail-fast: false
       matrix:
-        package: [Controllers, HummingbirdExample]
+        package: [Controllers, HummingbirdExample, VaporExample]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -85,7 +94,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [Controllers, HummingbirdExample]
+        package: [Controllers, HummingbirdExample, VaporExample]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
