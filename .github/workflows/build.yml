@@ -44,16 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # Hummingbird self-verifies in its executable (its test client isn't tied to a test
-          # framework), so `swift run` drives every route in-process.
-          - example: HummingbirdExample
-            verify: swift run HummingbirdExample
-          # Vapor's testing tools only link into test targets, so verification lives in
-          # `swift test`, which provisions a throwaway Postgres via swift-local-containers
-          # (Docker is preinstalled on the runner).
-          - example: VaporExample
-            verify: swift test
+        example: [HummingbirdExample, VaporExample]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -63,11 +54,14 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y libssl-dev libsqlite3-dev
       - name: Run
-        # Bootstraps the graph (collating the shared Controllers package across the package
-        # boundary), applies the WireMVC controllers onto the runtime's transport alongside a
-        # native route, and drives every route. Prints "OK" / passes, or exits non-zero.
+        # Each example is a real app structured with its framework's testing idiom, so the
+        # end-to-end verification lives in `swift test`: buildApplication/configure bootstraps
+        # the graph (collating the shared Controllers package across the package boundary),
+        # applies the WireMVC controllers onto the runtime's transport alongside a native route,
+        # and drives every route. Vapor provisions a throwaway Postgres via swift-local-containers
+        # (Docker is preinstalled on the runner); Hummingbird uses in-memory SQLite.
         working-directory: ${{ matrix.example }}
-        run: ${{ matrix.verify }}
+        run: swift test
 
   SwiftFormat:
     name: swift-format / ${{ matrix.package }}

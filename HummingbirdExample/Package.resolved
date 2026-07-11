@@ -1,5 +1,5 @@
 {
-  "originHash" : "bf58eb236443df7fd776a9cc93b4f521d60c9c232ba58c93b8d57980c3485af6",
+  "originHash" : "f1ea76cd0f7def621e5dbaec1b6160a67c471e21b14ba2e8d2b403c69263f6d7",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -35,6 +35,15 @@
       "state" : {
         "revision" : "87e50f483c54e6efd60e885f7f5aa946cee68023",
         "version" : "1.2.1"
+      }
+    },
+    {
+      "identity" : "swift-argument-parser",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-argument-parser.git",
+      "state" : {
+        "revision" : "6a52f3251125d74daf04fcbd5e6f08a75d074382",
+        "version" : "1.8.2"
       }
     },
     {
@@ -259,7 +268,7 @@
       "location" : "https://github.com/tachyonics/swift-wire.git",
       "state" : {
         "branch" : "main",
-        "revision" : "b100317d7edc10e3602a1e9308648c4d69ac2ccb"
+        "revision" : "70748729ba8a0d621f54790c59e5891704c7c0b7"
       }
     },
     {
