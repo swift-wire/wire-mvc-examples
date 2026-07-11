@@ -5,6 +5,11 @@ import PackageDescription
 // from Vapor's and from the http-api-proposal's 6.4 requirement. The shared controllers arrive
 // via a path dependency on ../Controllers, so this compiles the *same* controller source as
 // every other runtime; only the transport + backend differ.
+//
+// Structured like a real Hummingbird app (as `hummingbird-examples/todos-*` and the Hummingbird
+// template are): `buildApplication` in the target assembles the app, a thin `@main`
+// AsyncParsableCommand serves it, and `HummingbirdExampleTests` drives the routes with
+// HummingbirdTesting. Verification lives in the test target, not in `main`.
 let package = Package(
     name: "HummingbirdExample",
     platforms: [.macOS(.v15)],
@@ -15,6 +20,7 @@ let package = Package(
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0"),
         .package(url: "https://github.com/swift-server/swift-openapi-hummingbird.git", from: "2.0.0"),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.0.0"),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
     ],
     targets: [
         .executableTarget(
@@ -24,11 +30,20 @@ let package = Package(
                 .product(name: "WireMVC", package: "wire-mvc"),
                 .product(name: "Wire", package: "swift-wire"),
                 .product(name: "Hummingbird", package: "hummingbird"),
-                .product(name: "HummingbirdTesting", package: "hummingbird"),
                 .product(name: "OpenAPIHummingbird", package: "swift-openapi-hummingbird"),
                 .product(name: "GRDB", package: "GRDB.swift"),
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
             plugins: [.plugin(name: "WireBuildPlugin", package: "swift-wire")]
-        )
+        ),
+        .testTarget(
+            name: "HummingbirdExampleTests",
+            dependencies: [
+                "HummingbirdExample",
+                .product(name: "HummingbirdTesting", package: "hummingbird"),
+                .product(name: "Controllers", package: "Controllers"),
+                .product(name: "Wire", package: "swift-wire"),
+            ]
+        ),
     ]
 )
