@@ -63,6 +63,25 @@ jobs:
         working-directory: ${{ matrix.example }}
         run: swift test
 
+  SwiftHttpServerExample:
+    name: SwiftHttpServerExample / Swift 6.4 nightly
+    # The swift-http-api-proposal runtime is swift-tools-version 6.4 and depends on the (still
+    # pre-release) proposal + swift-http-server, so it builds only on the 6.4 toolchain — via the
+    # nightly container, since SwiftyLab/setup-swift installs released toolchains only. The test
+    # starts NIOHTTPServer in-process and asserts a real 200 OK over the loopback.
+    runs-on: ubuntu-24.04
+    container: swiftlang/swift:nightly-6.4.x-noble
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install dependencies
+        run: apt-get update && apt-get install -y libssl-dev
+      - name: Build
+        working-directory: SwiftHttpServerExample
+        run: swift build
+      - name: Test (verifies 200 OK)
+        working-directory: SwiftHttpServerExample
+        run: swift test
+
   SwiftFormat:
     name: swift-format / ${{ matrix.package }}
     strategy:
