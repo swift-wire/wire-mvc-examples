@@ -44,6 +44,7 @@ let package = Package(
         ),
         .package(url: "https://github.com/apple/swift-http-types.git", from: "1.6.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.13.2"),
+        .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.0.0"),
         .package(url: "https://github.com/tachyonics/swift-local-containers.git", from: "0.10.0"),
     ],
     targets: [
@@ -60,6 +61,10 @@ let package = Package(
                 .product(name: "AsyncStreaming", package: "swift-async-algorithms"),
                 .product(name: "HTTPTypes", package: "swift-http-types"),
                 .product(name: "Logging", package: "swift-log"),
+                // This runtime binds no services, but the generated `_WireGraph: WireMVCComposable`
+                // conformance references `any Service` (and `MemberImportVisibility` is on, so it must
+                // be a direct dependency).
+                .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
             ],
             swiftSettings: extraSettings,
             plugins: [.plugin(name: "WireBuildPlugin", package: "swift-wire")]

@@ -27,6 +27,7 @@ let package = Package(
         .package(url: "https://github.com/orlandos-nl/MongoKitten.git", from: "7.0.0"),
         .package(url: "https://github.com/tachyonics/swift-local-containers.git", from: "0.10.0"),
         .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0"),
+        .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.0.0"),
     ],
     targets: [
         .executableTarget(
@@ -40,6 +41,9 @@ let package = Package(
                 .product(name: "OpenAPIVapor", package: "swift-openapi-vapor"),
                 .product(name: "MongoKitten", package: "MongoKitten"),
                 .product(name: "Configuration", package: "swift-configuration"),
+                // This runtime binds no services, but the generated `_WireGraph: WireMVCComposable`
+                // conformance references `any Service`.
+                .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
             ],
             plugins: [.plugin(name: "WireBuildPlugin", package: "swift-wire")]
         ),

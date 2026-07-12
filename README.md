@@ -37,29 +37,44 @@ controller source — that's what makes it a genuine cross-runtime proof rather 
 - **Cross-module DI.** `TodosController` depends on a `TodoRepository` protocol declared in
   `Controllers` but *not* satisfied there; each runtime binds its own
   `@Singleton(as: TodoRepository.self)` backend. So each graph proves a library declares a need
-  and the app satisfies it across a package boundary. (`Hummingbird` → an embedded SQLite
-  database via GRDB; other runtimes → other backends.)
+  and the app satisfies it across a package boundary. (`Hummingbird` → a real Valkey key-value
+  store, its client run as a graph-hosted service; other runtimes → other backends.)
 - **The persistence axis collapses to one binding.** The six `hummingbird-examples/todos-*`
   differ mainly in their database (DynamoDB / Fluent / Postgres / …). Here that's a single
-  `@Singleton(as: TodoRepository.self)` swap — the heavyweight backends are absent only because
-  they need external infra, not because they'd change a line of the controller.
+  `@Singleton(as: TodoRepository.self)` swap, and each runtime demonstrates a *different* real
+  backend through that one binding — Valkey (Hummingbird), MongoDB (Vapor), CouchDB (proposal) —
+  without changing a line of the controller.
+- **The graph can host services.** A backend that owns a `ServiceLifecycle` run loop (a client's
+  connection pool) is contributed to WireMVC's `services` collation; `apply` returns the collated
+  `[any Service]`, and the app runs them in its `ServiceGroup` alongside the server. The Hummingbird
+  runtime's Valkey client is bound *and* run this way.
 
 ## Running
 
-Each package is standalone; run its executable from its directory:
+Each package is standalone; run its executable from its directory (it reads its backend's connection
+from the environment — e.g. `VALKEY_HOST`/`VALKEY_PORT` for Hummingbird — against a real store you
+provide):
 
 ```
 cd HummingbirdExample && swift run HummingbirdExample
 ```
 
-It self-tests every route in-process (via `HummingbirdTesting`) and prints `OK` or exits
-non-zero. Validated on macOS and Linux (see CI).
+Route verification lives in each package's test target, which drives the full CRUD lifecycle against a
+throwaway backend container it provisions via swift-local-containers — so `swift test` needs a
+container runtime (Docker); the suites skip themselves when none is available. Validated on macOS and
+Linux (see CI).
 
 ## Status
 
-- **Hummingbird** — current, proposal-native (Swift 6.4, SQLite/GRDB backend). Serves the proposal-native
-  `Controllers` on Hummingbird's `Router` via the `WireMVCServerTransport` adapter (the wire-mvc
-  `ServerTransport` trait, `swift-openapi-hummingbird` providing the `Router: ServerTransport` conformance).
+- **Hummingbird** — current, proposal-native (Swift 6.4, real Valkey via swift-local-containers). Serves
+  the proposal-native `Controllers` on Hummingbird's `Router` via the `WireMVCServerTransport` adapter
+  (the wire-mvc `ServerTransport` trait, `swift-openapi-hummingbird` providing the `Router:
+  ServerTransport` conformance). Todos are stored in Valkey — a key-value store (each todo a JSON
+  string, insertion order in a list, ids from `INCR`) — reached with the `valkey-swift` client. The
+  client is a `ServiceLifecycle.Service`: it's `@Contributes(to: WireMVCKeys.services)`, so WireMVC
+  collates it into the graph's services and `Application(services:)` runs its connection pool alongside
+  the server. The integration test provisions a throwaway Valkey container and drives the routes via
+  HummingbirdTesting's `.live` mode (which runs the app's ServiceGroup).
 - **Vapor** — current, proposal-native (Swift 6.4, real MongoDB via swift-local-containers). Serves the
   proposal-native `Controllers` on Vapor's transport via the `WireMVCServerTransport` adapter
   (`swift-openapi-vapor` providing `VaporTransport: ServerTransport`); todos are stored in MongoDB

@@ -1,7 +1,10 @@
+import ContainerMacrosLib
+import ContainerTestSupport
 import Controllers
 import HTTPTypes
 import Hummingbird
 import HummingbirdTesting
+import LocalContainers
 import Testing
 import Wire  // WiringModel (for the /wiring check)
 
@@ -13,22 +16,51 @@ import FoundationEssentials
 import Foundation
 #endif
 
-/// Test-only `AppArguments`: an ephemeral port, since the in-memory `.router` test client never
-/// binds a socket.
+#if canImport(Glibc)
+import Glibc
+#elseif canImport(Darwin)
+import Darwin
+#endif
+
+/// The throwaway Valkey the integration test runs against — provisioned and torn down by the
+/// `containerTrait`, not by the app. The official image runs without auth, so no environment is needed;
+/// the `.log` wait strategy holds until Valkey is actually accepting connections, not merely listening.
+@Containers
+struct TodoContainers {
+    @Container(
+        image: "valkey/valkey:8",
+        ports: [6379],
+        waitStrategy: .log("Ready to accept connections")
+    )
+    var valkey: RunningContainer
+}
+
+/// Test-only `AppArguments`: an ephemeral port picked by the OS for the `.live` server.
 struct TestArguments: AppArguments {
     var hostname = "127.0.0.1"
     var port = 0
 }
 
-@Suite("HummingbirdExample routes")
+@Suite(
+    "HummingbirdExample routes",
+    TodoContainers.containerTrait,
+    .enabled(if: containerRuntimeAvailable, "A container runtime (Docker) is required")
+)
 struct TodoVerificationTests {
-    /// Drives every route in-process with HummingbirdTesting — the native Hummingbird route plus
-    /// the WireMVC todos CRUD (backed by the in-memory SQLite repository) and the cross-runtime
-    /// `/wiring` introspection endpoint. `buildApplication` assembles the app the same way `main`
-    /// does; `.router` runs the request through the router without binding a socket.
-    @Test func drivesEveryRouteOverSQLite() async throws {
+    let containers = TodoContainers()
+
+    /// Drives every route with HummingbirdTesting — the native Hummingbird route plus the WireMVC todos
+    /// CRUD (backed by the test's Valkey container) and the cross-runtime `/wiring` introspection
+    /// endpoint. The container's host/port are exported as the connection env the Valkey client reads,
+    /// then `buildApplication` assembles the app the same way `main` does. `.live` (not `.router`) runs
+    /// the app's `ServiceGroup`, so the graph's Valkey service connects before requests flow — and the
+    /// service is stopped when the test finishes and the app shuts down.
+    @Test func drivesEveryRouteOverValkey() async throws {
+        setenv("VALKEY_HOST", containers.valkey.host, 1)
+        setenv("VALKEY_PORT", String(try containers.valkey.mappedPort(6379)), 1)
+
         let app = try await buildApplication(TestArguments())
-        try await app.test(.router) { client in
+        try await app.test(.live) { client in
             func decode<T: Decodable>(_ type: T.Type, _ response: TestResponse) throws -> T {
                 try JSONDecoder().decode(T.self, from: Data(response.body.readableBytesView))
             }
