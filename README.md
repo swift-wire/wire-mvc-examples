@@ -60,10 +60,11 @@ non-zero. Validated on macOS and Linux (see CI).
 - **Hummingbird** — current, proposal-native (Swift 6.4, SQLite/GRDB backend). Serves the proposal-native
   `Controllers` on Hummingbird's `Router` via the `WireMVCServerTransport` adapter (the wire-mvc
   `ServerTransport` trait, `swift-openapi-hummingbird` providing the `Router: ServerTransport` conformance).
-- **Vapor** — current, proposal-native (Swift 6.4, real Postgres via swift-local-containers). Serves the
+- **Vapor** — current, proposal-native (Swift 6.4, real MongoDB via swift-local-containers). Serves the
   proposal-native `Controllers` on Vapor's transport via the `WireMVCServerTransport` adapter
-  (`swift-openapi-vapor` providing `VaporTransport: ServerTransport`); the integration test provisions a
-  throwaway Postgres container and tears it down on shutdown via the graph's `@Teardown`.
+  (`swift-openapi-vapor` providing `VaporTransport: ServerTransport`); todos are stored in MongoDB
+  (MongoKitten, a document store — distinct from Hummingbird's embedded SQL), and the integration test
+  provisions a throwaway Mongo container and disconnects it on shutdown via the graph's `@Teardown`.
 - **SwiftHttpServerExample** (proposal) — current (Swift 6.4). Serves the controllers directly over
   `swift-http-api-proposal`'s `HTTPServer` (swift-server's `NIOHTTPServer`): `@Controller`'s generated
   witnesses register onto a trie `RoutableHTTPServerBuilder`, which freezes into the server's request

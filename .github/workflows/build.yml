@@ -32,7 +32,7 @@ jobs:
   EndToEnd:
     name: End-to-end / ${{ matrix.example }} / Swift 6.4 nightly
     # Hummingbird (in-memory SQLite) and SwiftHttpServerExample (in-memory) drive every route in-process
-    # with no external infra, so they run in the container. VaporExample needs Docker (a real Postgres
+    # with no external infra, so they run in the container. VaporExample needs Docker (a real MongoDB
     # via swift-local-containers), which a container job can't reach — it gets its own job below, on a
     # plain runner with the toolchain installed via Swiftly so native Docker is available.
     strategy:
@@ -53,8 +53,8 @@ jobs:
         run: swift test
 
   VaporIntegration:
-    name: End-to-end / VaporExample (Postgres via Docker) / Swift 6.4 nightly
-    # Vapor's integration test provisions a real Postgres via swift-local-containers, so it needs
+    name: End-to-end / VaporExample (MongoDB via Docker) / Swift 6.4 nightly
+    # Vapor's integration test provisions a real MongoDB via swift-local-containers, so it needs
     # Docker — native on the GitHub ubuntu runner, but unreachable from a container job. So this one
     # job installs the 6.4 nightly toolchain with Swiftly (rather than the container), keeping Docker
     # native. The snapshot is pinned here because .swift-version is gitignored (not in the checkout);
@@ -74,9 +74,9 @@ jobs:
           ./swiftly init --assume-yes --skip-install
           echo "$HOME/.local/share/swiftly/bin" >> "$GITHUB_PATH"
           "$HOME/.local/share/swiftly/bin/swiftly" install "$SWIFT_SNAPSHOT" --use --assume-yes
-      - name: Run integration test (real Postgres via swift-local-containers)
-        # Docker is preinstalled on the ubuntu runner; swift-local-containers pulls postgres:16-alpine,
-        # the graph's @Teardown stops it on shutdown, and VaporTesting drives every route. Run via
+      - name: Run integration test (real MongoDB via swift-local-containers)
+        # Docker is preinstalled on the ubuntu runner; swift-local-containers pulls mongo:7, the
+        # graph's @Teardown disconnects it on shutdown, and VaporTesting drives every route. Run via
         # `swiftly run` (Swiftly stays unlinked, so there's no `swift` shim on PATH to rely on).
         working-directory: VaporExample
         run: swiftly run swift test

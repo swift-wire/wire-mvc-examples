@@ -24,7 +24,7 @@ let package = Package(
         .package(url: "https://github.com/tachyonics/swift-wire.git", branch: "main"),
         .package(url: "https://github.com/vapor/vapor.git", from: "4.106.0"),
         .package(url: "https://github.com/swift-server/swift-openapi-vapor.git", from: "1.0.0"),
-        .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.21.0"),
+        .package(url: "https://github.com/orlandos-nl/MongoKitten.git", from: "7.0.0"),
         .package(url: "https://github.com/tachyonics/swift-local-containers.git", from: "0.10.0"),
         .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0"),
     ],
@@ -38,12 +38,12 @@ let package = Package(
                 .product(name: "Wire", package: "swift-wire"),
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "OpenAPIVapor", package: "swift-openapi-vapor"),
-                .product(name: "PostgresNIO", package: "postgres-nio"),
+                .product(name: "MongoKitten", package: "MongoKitten"),
                 .product(name: "Configuration", package: "swift-configuration"),
             ],
             plugins: [.plugin(name: "WireBuildPlugin", package: "swift-wire")]
         ),
-        // The integration test provisions a throwaway Postgres via swift-local-containers'
+        // The integration test provisions a throwaway MongoDB via swift-local-containers'
         // test-support macros (`@Containers`/`@Container` + `containerTrait`), then drives the
         // routes with VaporTesting — the container is a test concern, not the app's.
         .testTarget(
