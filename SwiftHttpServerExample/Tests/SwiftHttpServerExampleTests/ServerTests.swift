@@ -1,5 +1,8 @@
+import ContainerMacrosLib
+import ContainerTestSupport
 import Controllers
 import Foundation
+import LocalContainers
 import NIOHTTPServer
 import Testing
 
@@ -9,19 +12,52 @@ import Testing
 import FoundationNetworking
 #endif
 
-@Suite("SwiftHttpServerExample")
+#if canImport(Glibc)
+import Glibc
+#elseif canImport(Darwin)
+import Darwin
+#endif
+
+/// The throwaway CouchDB the integration test runs against — provisioned and torn down by the
+/// `containerTrait`, not by the app. CouchDB 3 won't start without an admin, so `COUCHDB_USER`/
+/// `COUCHDB_PASSWORD` configure the image; the `.log` wait strategy holds until CouchDB is actually
+/// up, not merely listening.
+@Containers
+struct TodoContainers {
+    @Container(
+        image: "couchdb:3",
+        ports: [5984],
+        environment: ["COUCHDB_USER": "admin", "COUCHDB_PASSWORD": "password"],
+        waitStrategy: .log("Apache CouchDB has started")
+    )
+    var couchdb: RunningContainer
+}
+
+@Suite(
+    "SwiftHttpServerExample",
+    TodoContainers.containerTrait,
+    .enabled(if: containerRuntimeAvailable, "A container runtime (Docker) is required")
+)
 struct TodosRoutingTests {
+    let containers = TodoContainers()
+
     struct TestArguments: AppArguments {
         let hostname = "127.0.0.1"
         let port = 0  // ephemeral
     }
 
-    /// Builds the app (Wire bootstraps the in-memory repository into the collated TodosController,
+    /// Builds the app (Wire bootstraps the CouchDB repository into the collated TodosController,
     /// registered onto the trie router), serves it on an ephemeral loopback port, and drives the full
-    /// todos CRUD lifecycle plus `/wiring` with real HTTP requests — then cancels serving. All
-    /// in-process; no container or external infra.
+    /// todos CRUD lifecycle plus `/wiring` with real HTTP requests — then cancels serving. The
+    /// controllers are served on the proposal server; the repository reaches CouchDB (the test's
+    /// container) through the proposal client — the proposal end to end.
     @Test
-    func servesTodosCRUD() async throws {
+    func servesTodosCRUDOverCouchDB() async throws {
+        setenv("COUCHDB_HOST", containers.couchdb.host, 1)
+        setenv("COUCHDB_PORT", String(try containers.couchdb.mappedPort(5984)), 1)
+        setenv("COUCHDB_USER", "admin", 1)
+        setenv("COUCHDB_PASSWORD", "password", 1)
+
         let (server, router) = try await buildApplication(TestArguments())
         let handler = router.freeze()
         try await withThrowingTaskGroup(of: Void.self) { group in
