@@ -6,19 +6,17 @@ runtime that assembles the **same** controller source onto a different HTTP stac
 
 ```
 Controllers/            # framework-free @Controller types, proposal-native (WireMVC + Wire, Swift 6.4)
-ControllersLegacy/      # the same controllers, ServerTransport-era — for Vapor, for now (Swift 6.3)
 HummingbirdExample/     # Hummingbird runtime (Swift 6.4) — proposal-native via WireMVCServerTransport, ../Controllers
-VaporExample/           # Vapor runtime       (Swift 6.3, ServerTransport) — path dep on ../ControllersLegacy
+VaporExample/           # Vapor runtime       (Swift 6.4) — proposal-native via WireMVCServerTransport, ../Controllers
 SwiftHttpServerExample/ # swift-http-api-proposal runtime (Swift 6.4) — path dep on ../Controllers
 ```
 
-WireMVC's core is now proposal-native (it dispatches over `swift-http-api-proposal`'s `HTTPServer`,
-which raises a **Swift 6.4** floor). The runtimes reach it two ways: `SwiftHttpServerExample` serves
-the controllers *directly* on a proposal server, while `HummingbirdExample` serves the same
-proposal-native controllers on Hummingbird's `Router` via the **`WireMVCServerTransport`** adapter (the
-wire-mvc `ServerTransport` trait, enabled in its manifest) — both on Swift 6.4 against the new
-`Controllers`. Only `VaporExample` still runs on Swift 6.3 against `ControllersLegacy`, until it
-migrates the same way.
+WireMVC's core is proposal-native (it dispatches over `swift-http-api-proposal`'s `HTTPServer`, which
+raises a **Swift 6.4** floor). The runtimes reach it two ways: `SwiftHttpServerExample` serves the
+controllers *directly* on a proposal server, while `HummingbirdExample` and `VaporExample` serve the
+same proposal-native controllers on their framework's `Router` via the **`WireMVCServerTransport`**
+adapter (the wire-mvc `ServerTransport` trait, enabled in their manifests). All four packages are
+Swift 6.4, against the one `Controllers` package.
 
 Each runtime is its **own Swift package** so their dependency trees stay isolated (Hummingbird's vs
 Vapor's swift-nio pins). The
@@ -27,12 +25,12 @@ controller source — that's what makes it a genuine cross-runtime proof rather 
 
 ## What each example demonstrates
 
-- **Cross-runtime portability.** The controllers (`@Singleton @Controller` todos CRUD) are
-  byte-identical across every executable — the source in `Controllers/` and `ControllersLegacy/` is
-  the same, differing only in which WireMVC it targets. Only the *assembly* differs: each app builds
-  its runtime's router and `WireMVC.apply(graph, to: &router)` registers the collated routes onto it
-  — a `some ServerTransport` for Hummingbird/Vapor, a `some RoutableHTTPServerBuilder` (a trie router)
-  for the proposal runtime. WireMVC stays router/transport-agnostic.
+- **Cross-runtime portability.** The controllers (`@Singleton @Controller` todos CRUD) in
+  `Controllers/` are byte-identical across every executable. Only the *assembly* differs: each app
+  builds its runtime's router and registers the collated routes onto it — `WireMVCServerTransport.apply`
+  onto a `some ServerTransport` for Hummingbird/Vapor, `WireMVC.apply` onto a `some
+  RoutableHTTPServerBuilder` (a trie router) for the proposal runtime. WireMVC stays
+  router/transport-agnostic.
 - **Coexistence.** The ServerTransport runtimes also register a *native* route the framework's own
   way (`/health`), on the same router — WireMVC registers *onto* the app's transport, it doesn't own
   the router (collation, not registration).
@@ -62,8 +60,10 @@ non-zero. Validated on macOS and Linux (see CI).
 - **Hummingbird** — current, proposal-native (Swift 6.4, SQLite/GRDB backend). Serves the proposal-native
   `Controllers` on Hummingbird's `Router` via the `WireMVCServerTransport` adapter (the wire-mvc
   `ServerTransport` trait, `swift-openapi-hummingbird` providing the `Router: ServerTransport` conformance).
-- **Vapor** — planned (Swift 6.3, `ServerTransport` via `swift-openapi-vapor`, Postgres backend). Still on
-  `ControllersLegacy`, until it migrates onto proposal-native WireMVC the same way Hummingbird did.
+- **Vapor** — current, proposal-native (Swift 6.4, real Postgres via swift-local-containers). Serves the
+  proposal-native `Controllers` on Vapor's transport via the `WireMVCServerTransport` adapter
+  (`swift-openapi-vapor` providing `VaporTransport: ServerTransport`); the integration test provisions a
+  throwaway Postgres container and tears it down on shutdown via the graph's `@Teardown`.
 - **SwiftHttpServerExample** (proposal) — current (Swift 6.4). Serves the controllers directly over
   `swift-http-api-proposal`'s `HTTPServer` (swift-server's `NIOHTTPServer`): `@Controller`'s generated
   witnesses register onto a trie `RoutableHTTPServerBuilder`, which freezes into the server's request
