@@ -29,40 +29,18 @@ jobs:
         working-directory: ${{ matrix.package }}
         run: swift build
 
-  EndToEnd:
-    name: End-to-end / ${{ matrix.example }} / Swift 6.4 nightly
-    # Hummingbird (in-memory SQLite) drives every route in-process with no external infra, so it runs
-    # in the container. VaporExample (real MongoDB) and SwiftHttpServerExample (real CouchDB) both
-    # provision a container via swift-local-containers, which a container job can't reach — they get
-    # their own Docker job below, on a plain runner with the toolchain installed via Swiftly.
-    strategy:
-      fail-fast: false
-      matrix:
-        example: [HummingbirdExample]
-    runs-on: ubuntu-24.04
-    container: swiftlang/swift:nightly-6.4.x-noble
-    steps:
-      - uses: actions/checkout@v6
-      - name: Install dependencies
-        run: apt-get update && apt-get install -y libssl-dev libsqlite3-dev
-      - name: Run
-        # Hummingbird bridges the proposal-native controllers onto its Router via WireMVCServerTransport
-        # and drives every route with HummingbirdTesting over an in-memory SQLite backend.
-        working-directory: ${{ matrix.example }}
-        run: swift test
-
   Integration:
     name: End-to-end / ${{ matrix.example }} (Docker) / Swift 6.4 nightly
-    # These integration tests provision a real datastore via swift-local-containers (Vapor → MongoDB,
-    # SwiftHttpServerExample → CouchDB), so they need Docker — native on the GitHub ubuntu runner, but
-    # unreachable from a container job. So this job installs the 6.4 nightly toolchain with Swiftly
-    # (rather than the container), keeping Docker native. The snapshot is pinned here because
-    # .swift-version is gitignored (not in the checkout); when it's garbage-collected upstream, bump
-    # it — the container jobs above already track latest.
+    # Every runtime's integration test provisions a real datastore via swift-local-containers
+    # (Hummingbird → Valkey, Vapor → MongoDB, SwiftHttpServerExample → CouchDB), so they need Docker —
+    # native on the GitHub ubuntu runner, but unreachable from a container job. So this job installs the
+    # 6.4 nightly toolchain with Swiftly (rather than the container), keeping Docker native. The
+    # snapshot is pinned here because .swift-version is gitignored (not in the checkout); when it's
+    # garbage-collected upstream, bump it — the container jobs above already track latest.
     strategy:
       fail-fast: false
       matrix:
-        example: [VaporExample, SwiftHttpServerExample]
+        example: [HummingbirdExample, VaporExample, SwiftHttpServerExample]
     env:
       SWIFT_SNAPSHOT: "6.4.x-snapshot-2026-07-06"
     runs-on: ubuntu-24.04
@@ -79,9 +57,9 @@ jobs:
           echo "$HOME/.local/share/swiftly/bin" >> "$GITHUB_PATH"
           "$HOME/.local/share/swiftly/bin/swiftly" install "$SWIFT_SNAPSHOT" --use --assume-yes
       - name: Run integration test (real datastore via swift-local-containers)
-        # Docker is preinstalled on the ubuntu runner; swift-local-containers pulls the image (mongo:7
-        # / couchdb:3) and drives every route. Run via `swiftly run` (Swiftly stays unlinked, so
-        # there's no `swift` shim on PATH to rely on).
+        # Docker is preinstalled on the ubuntu runner; swift-local-containers pulls the image
+        # (valkey/valkey:8 / mongo:7 / couchdb:3) and drives every route. Run via `swiftly run` (Swiftly
+        # stays unlinked, so there's no `swift` shim on PATH to rely on).
         working-directory: ${{ matrix.example }}
         run: swiftly run swift test
 
