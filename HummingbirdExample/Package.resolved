@@ -1,5 +1,5 @@
 {
-  "originHash" : "f1ea76cd0f7def621e5dbaec1b6160a67c471e21b14ba2e8d2b403c69263f6d7",
+  "originHash" : "532e560cd26677272b4837d255ca371b34a5d73e65deb505d9b7ccc93e2b0b91",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -116,6 +116,15 @@
       "state" : {
         "revision" : "dc4030184203ffafbb2ec614352487235d747fe0",
         "version" : "1.4.1"
+      }
+    },
+    {
+      "identity" : "swift-http-api-proposal",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-http-api-proposal.git",
+      "state" : {
+        "revision" : "638af2b908d8109857389689d361e1f45f6617ea",
+        "version" : "0.2.0"
       }
     },
     {
@@ -249,8 +258,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swiftlang/swift-syntax",
       "state" : {
-        "revision" : "79e4b74a295b6eb74a8b585e3a39d29e70c1dbd1",
-        "version" : "603.0.2"
+        "branch" : "release/6.4.x",
+        "revision" : "050f1a346fbbac0ca2cfb15a95274f7bd1cf0ccf"
       }
     },
     {
@@ -277,7 +286,7 @@
       "location" : "https://github.com/tachyonics/wire-mvc.git",
       "state" : {
         "branch" : "main",
-        "revision" : "8a993d2952d450e6dd6c03d8657bee081cd1583b"
+        "revision" : "e9ad6de1d0da93d268522c08fe6b0647eb686c1a"
       }
     }
   ],
