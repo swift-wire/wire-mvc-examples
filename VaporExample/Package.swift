@@ -2,8 +2,9 @@
 import PackageDescription
 
 // Runtime 2: Vapor — its own package, so Vapor's dependency tree is isolated from Hummingbird's.
-// The shared controllers arrive via the ../Controllers path dependency (identical source); only
-// the transport (Vapor's `ServerTransport` via swift-openapi-vapor) and the bound backend differ.
+// The controllers arrive via the ../ControllersLegacy path dependency (the ServerTransport-era
+// controllers, until this example migrates to proposal-native WireMVC); only the transport (Vapor's
+// `ServerTransport` via swift-openapi-vapor) and the bound backend differ.
 //
 // Structured like a real Vapor app: the `VaporExample` executable target holds the app assembly
 // (`configure`) plus a thin serving `@main`, and `VaporExampleTests` drives the routes with
@@ -13,7 +14,7 @@ let package = Package(
     name: "VaporExample",
     platforms: [.macOS(.v15)],
     dependencies: [
-        .package(path: "../Controllers"),
+        .package(path: "../ControllersLegacy"),
         .package(url: "https://github.com/tachyonics/wire-mvc.git", branch: "main"),
         .package(url: "https://github.com/tachyonics/swift-wire.git", branch: "main"),
         .package(url: "https://github.com/vapor/vapor.git", from: "4.106.0"),
@@ -26,7 +27,7 @@ let package = Package(
         .executableTarget(
             name: "VaporExample",
             dependencies: [
-                .product(name: "Controllers", package: "Controllers"),
+                .product(name: "Controllers", package: "ControllersLegacy"),
                 .product(name: "WireMVC", package: "wire-mvc"),
                 .product(name: "Wire", package: "swift-wire"),
                 .product(name: "Vapor", package: "vapor"),
@@ -44,7 +45,7 @@ let package = Package(
             dependencies: [
                 "VaporExample",
                 .product(name: "VaporTesting", package: "vapor"),
-                .product(name: "Controllers", package: "Controllers"),
+                .product(name: "Controllers", package: "ControllersLegacy"),
                 .product(name: "Wire", package: "swift-wire"),
                 .product(name: "ContainerMacrosLib", package: "swift-local-containers"),
                 .product(name: "ContainerTestSupport", package: "swift-local-containers"),

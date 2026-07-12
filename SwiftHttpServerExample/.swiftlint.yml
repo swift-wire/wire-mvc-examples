@@ -1,6 +1,10 @@
 disabled_rules:
   - trailing_whitespace
   - void_return
+  # swift-format owns brace placement; it puts the opening brace on its own line after a
+  # multi-line `where` clause (which the proposal's ~Copyable generic constraints require),
+  # which this rule disagrees with. Cede formatting to the formatter.
+  - opening_brace
 analyzer_rules:
   - unused_import
 included:

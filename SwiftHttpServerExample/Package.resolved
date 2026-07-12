@@ -1,5 +1,5 @@
 {
-  "originHash" : "5be7c190098543271eb3bf876a1775e09c6c036a05d39a1e0a91996a937ab20e",
+  "originHash" : "734fa3c97695332cb5faa01c19f0d6d64434cc857117c08b1e133ba4868587a2",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -209,12 +209,39 @@
       }
     },
     {
+      "identity" : "swift-syntax",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swiftlang/swift-syntax",
+      "state" : {
+        "branch" : "release/6.4.x",
+        "revision" : "050f1a346fbbac0ca2cfb15a95274f7bd1cf0ccf"
+      }
+    },
+    {
       "identity" : "swift-system",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-system",
       "state" : {
         "revision" : "b5544ba79a70a0cb3563e75bf26dc198d6b40ed3",
         "version" : "1.7.4"
+      }
+    },
+    {
+      "identity" : "swift-wire",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tachyonics/swift-wire.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "b8103afee9634510b3a90b101ec34535b555255c"
+      }
+    },
+    {
+      "identity" : "wire-mvc",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tachyonics/wire-mvc.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "844860d247f4c0102140e0e1e6b612ec1468f0c7"
       }
     }
   ],
