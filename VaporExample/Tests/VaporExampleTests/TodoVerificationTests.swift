@@ -21,19 +21,18 @@ import Glibc
 import Darwin
 #endif
 
-/// The throwaway Postgres the integration test runs against — provisioned and torn down by the
-/// `containerTrait`, not by the app. `POSTGRES_PASSWORD`/`POSTGRES_DB` configure the image (it
-/// won't initialise without a password), and the `.log` wait strategy holds until Postgres is
-/// actually accepting connections, not merely listening.
+/// The throwaway MongoDB the integration test runs against — provisioned and torn down by the
+/// `containerTrait`, not by the app. The official image runs without auth unless a root user is set,
+/// so no environment is needed; the `.log` wait strategy holds until Mongo is actually accepting
+/// connections, not merely listening.
 @Containers
 struct TodoContainers {
     @Container(
-        image: "postgres:16-alpine",
-        ports: [5432],
-        environment: ["POSTGRES_PASSWORD": "postgres", "POSTGRES_DB": "todos"],
-        waitStrategy: .log("database system is ready to accept connections")
+        image: "mongo:7",
+        ports: [27017],
+        waitStrategy: .log("Waiting for connections")
     )
-    var postgres: RunningContainer
+    var mongo: RunningContainer
 }
 
 @Suite(
@@ -44,13 +43,13 @@ struct TodoVerificationTests {
     let containers = TodoContainers()
 
     /// Drives every route in-process with VaporTesting — the native Vapor route plus the WireMVC
-    /// todos CRUD (backed by the test's Postgres container) and the cross-runtime `/wiring`
+    /// todos CRUD (backed by the test's MongoDB container) and the cross-runtime `/wiring`
     /// introspection endpoint. The container's host/port are exported as the connection env the
     /// repository reads, then `withApp(configure:)` builds the app the same way `main` does and
-    /// shuts it down after — which runs the `@Teardown` that closes the connection pool.
-    @Test func drivesEveryRouteOverRealPostgres() async throws {
-        setenv("DATABASE_HOST", containers.postgres.host, 1)
-        setenv("DATABASE_PORT", String(try containers.postgres.mappedPort(5432)), 1)
+    /// shuts it down after — which runs the `@Teardown` that disconnects the Mongo cluster.
+    @Test func drivesEveryRouteOverRealMongoDB() async throws {
+        setenv("MONGO_HOST", containers.mongo.host, 1)
+        setenv("MONGO_PORT", String(try containers.mongo.mappedPort(27017)), 1)
 
         try await withApp(configure: configure) { app in
             let tester = try app.testing()
