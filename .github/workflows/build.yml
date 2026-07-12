@@ -6,16 +6,22 @@ on:
   pull_request:
     branches: [ main ]
 
-# Each runtime is its own Swift package (isolated dependency tree), so CI runs a matrix over
-# the packages, each built/linted in its own directory. The shared `Controllers` package comes
-# in via a path dependency.
+# Each runtime is its own Swift package (isolated dependency tree), so CI runs a matrix over the
+# packages, each built/linted in its own directory. The examples split across two toolchains:
+#   - Swift 6.3 (released, via SwiftyLab): the ServerTransport-era runtimes — Hummingbird + Vapor —
+#     and the controllers they share, ControllersLegacy.
+#   - Swift 6.4 (nightly container): the proposal-native runtime — SwiftHttpServerExample, on the
+#     swift-http-api-proposal server — and the proposal-native controllers it shares, Controllers.
+# SwiftLint's `lint` parses both, so it runs over every package on a plain runner. (Its `unused_import`
+# analyzer runs only on the 6.3 packages — its SourceKit can't parse the 6.4 build log's flags; the
+# compiler's InternalImportsByDefault covers unused imports on 6.4.)
 jobs:
-  Build:
-    name: ${{ matrix.package }} / Linux
+  Build63:
+    name: ${{ matrix.package }} / Swift 6.3
     strategy:
       fail-fast: false
       matrix:
-        package: [Controllers, HummingbirdExample, VaporExample]
+        package: [ControllersLegacy, HummingbirdExample, VaporExample]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -39,7 +45,26 @@ jobs:
         working-directory: ${{ matrix.package }}
         run: swiftlint analyze --strict --quiet --compiler-log-path build.log
 
-  EndToEnd:
+  Build64:
+    name: ${{ matrix.package }} / Swift 6.4 nightly
+    # The proposal-native packages are swift-tools-version 6.4 and depend on the (still pre-release)
+    # swift-http-api-proposal + swift-http-server, so they build only on the 6.4 toolchain — via the
+    # nightly container, since SwiftyLab/setup-swift installs released toolchains only.
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [Controllers, SwiftHttpServerExample]
+    runs-on: ubuntu-24.04
+    container: swiftlang/swift:nightly-6.4.x-noble
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install dependencies
+        run: apt-get update && apt-get install -y libssl-dev
+      - name: Build
+        working-directory: ${{ matrix.package }}
+        run: swift build
+
+  EndToEnd63:
     name: End-to-end / ${{ matrix.example }}
     strategy:
       fail-fast: false
@@ -55,39 +80,35 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libssl-dev libsqlite3-dev
       - name: Run
         # Each example is a real app structured with its framework's testing idiom, so the
-        # end-to-end verification lives in `swift test`: buildApplication/configure bootstraps
-        # the graph (collating the shared Controllers package across the package boundary),
-        # applies the WireMVC controllers onto the runtime's transport alongside a native route,
-        # and drives every route. Vapor provisions a throwaway Postgres via swift-local-containers
-        # (Docker is preinstalled on the runner); Hummingbird uses in-memory SQLite.
+        # end-to-end verification lives in `swift test`: buildApplication/configure bootstraps the
+        # graph (collating the shared ControllersLegacy package across the package boundary), applies
+        # the WireMVC controllers onto the runtime's transport alongside a native route, and drives
+        # every route. Vapor provisions a throwaway Postgres via swift-local-containers (Docker is
+        # preinstalled on the runner); Hummingbird uses in-memory SQLite.
         working-directory: ${{ matrix.example }}
         run: swift test
 
-  SwiftHttpServerExample:
-    name: SwiftHttpServerExample / Swift 6.4 nightly
-    # The swift-http-api-proposal runtime is swift-tools-version 6.4 and depends on the (still
-    # pre-release) proposal + swift-http-server, so it builds only on the 6.4 toolchain — via the
-    # nightly container, since SwiftyLab/setup-swift installs released toolchains only. The test
-    # starts NIOHTTPServer in-process and asserts a real 200 OK over the loopback.
+  EndToEnd64:
+    name: End-to-end / SwiftHttpServerExample / Swift 6.4 nightly
     runs-on: ubuntu-24.04
     container: swiftlang/swift:nightly-6.4.x-noble
     steps:
       - uses: actions/checkout@v6
       - name: Install dependencies
         run: apt-get update && apt-get install -y libssl-dev
-      - name: Build
-        working-directory: SwiftHttpServerExample
-        run: swift build
-      - name: Test (verifies 200 OK)
+      - name: Run
+        # Bootstraps the graph (collating the shared Controllers package + an in-memory repository),
+        # registers the controllers onto a trie RoutableHTTPServerBuilder, serves them on NIOHTTPServer,
+        # and drives the full todos CRUD lifecycle + /wiring over the loopback.
         working-directory: SwiftHttpServerExample
         run: swift test
 
-  SwiftFormat:
+  SwiftFormat63:
     name: swift-format / ${{ matrix.package }}
     strategy:
       fail-fast: false
       matrix:
-        package: [Controllers, HummingbirdExample, VaporExample]
+        package: [ControllersLegacy, HummingbirdExample, VaporExample]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -102,12 +123,33 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git diff --exit-code
 
-  SwiftLint:
-    name: SwiftLint 0.63.2 / ${{ matrix.package }}
+  SwiftFormat64:
+    name: swift-format (6.4) / ${{ matrix.package }}
     strategy:
       fail-fast: false
       matrix:
-        package: [Controllers, HummingbirdExample, VaporExample]
+        package: [Controllers, SwiftHttpServerExample]
+    runs-on: ubuntu-24.04
+    container: swiftlang/swift:nightly-6.4.x-noble
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run swift-format
+        # From the 6.4 toolchain so it parses the proposal's ~Copyable / consuming sending syntax.
+        working-directory: ${{ matrix.package }}
+        run: swift-format format --recursive --in-place .
+      - name: Check for formatting differences
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git diff --exit-code
+
+  SwiftLint:
+    name: SwiftLint 0.63.2 / ${{ matrix.package }}
+    # `swiftlint lint` is SwiftSyntax-based and parses both the 6.3 and 6.4 sources, so it needs no
+    # toolchain and runs on a plain runner over every package.
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [ControllersLegacy, HummingbirdExample, VaporExample, Controllers, SwiftHttpServerExample]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6

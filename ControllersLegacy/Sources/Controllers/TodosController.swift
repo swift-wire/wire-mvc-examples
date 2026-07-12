@@ -1,5 +1,5 @@
-public import Wire
-public import WireMVC
+import Wire
+import WireMVC
 
 /// The portable todos controller — identical across every runtime executable. It depends only
 /// on the `TodoRepository` protocol and WireMVC's declarative annotations; nothing
@@ -7,8 +7,8 @@ public import WireMVC
 /// shape — `some TodoRepository` on a stored property can't be assigned), resolved to whatever
 /// backend the executable binds via `@Singleton(as: TodoRepository.self)`.
 ///
-/// `@Singleton @Controller` makes it a graph binding whose routes `WireMVC.apply` registers onto a
-/// `RoutableHTTPServerBuilder` (the runtime's router).
+/// `@Singleton @Controller` makes it a graph binding whose routes are collated onto a
+/// `ServerTransport` by `WireMVC.apply`.
 @Singleton
 @Controller("/todos")
 public struct TodosController<Repository: TodoRepository>: Sendable {

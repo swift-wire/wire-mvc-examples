@@ -3,8 +3,8 @@ import PackageDescription
 
 // Runtime 1: Hummingbird — its own package, so its dependency tree (swift-nio, etc.) is isolated
 // from Vapor's and from the http-api-proposal's 6.4 requirement. The shared controllers arrive
-// via a path dependency on ../Controllers, so this compiles the *same* controller source as
-// every other runtime; only the transport + backend differ.
+// via a path dependency on ../ControllersLegacy (the ServerTransport-era controllers, until this
+// example migrates to proposal-native WireMVC); only the transport + backend differ.
 //
 // Structured like a real Hummingbird app (as `hummingbird-examples/todos-*` and the Hummingbird
 // template are): `buildApplication` in the target assembles the app, a thin `@main`
@@ -14,7 +14,7 @@ let package = Package(
     name: "HummingbirdExample",
     platforms: [.macOS(.v15)],
     dependencies: [
-        .package(path: "../Controllers"),
+        .package(path: "../ControllersLegacy"),
         .package(url: "https://github.com/tachyonics/wire-mvc.git", branch: "main"),
         .package(url: "https://github.com/tachyonics/swift-wire.git", branch: "main"),
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0"),
@@ -26,7 +26,7 @@ let package = Package(
         .executableTarget(
             name: "HummingbirdExample",
             dependencies: [
-                .product(name: "Controllers", package: "Controllers"),
+                .product(name: "Controllers", package: "ControllersLegacy"),
                 .product(name: "WireMVC", package: "wire-mvc"),
                 .product(name: "Wire", package: "swift-wire"),
                 .product(name: "Hummingbird", package: "hummingbird"),
@@ -41,7 +41,7 @@ let package = Package(
             dependencies: [
                 "HummingbirdExample",
                 .product(name: "HummingbirdTesting", package: "hummingbird"),
-                .product(name: "Controllers", package: "Controllers"),
+                .product(name: "Controllers", package: "ControllersLegacy"),
                 .product(name: "Wire", package: "swift-wire"),
             ]
         ),

@@ -1,12 +1,31 @@
-// swift-tools-version: 6.3
+// swift-tools-version: 6.4
 import PackageDescription
 
-// The portable, framework-free WireMVC controllers, shared by every runtime example via a path
-// dependency (`.package(path: "../Controllers")`). Depends only on WireMVC + Wire — no HTTP
-// framework — so the *same* controller source compiles into each runtime's isolated package.
+// The portable, framework-free WireMVC controllers, proposal-native. Shared by the proposal-based
+// runtime example(s) via a path dependency (`.package(path: "../Controllers")`). Depends only on
+// WireMVC + Wire — no HTTP framework — so the *same* controller source compiles into each runtime's
+// isolated package; `@Controller`'s generated witnesses register onto a `RoutableHTTPServerBuilder`.
+//
+// tools-version 6.4, deployment macOS 26, and the experimental/upcoming-feature flags match
+// proposal-native WireMVC — the generated witnesses interface with the proposal's `~Copyable` /
+// `consuming sending` streaming types, and macOS 26 makes `anyAppleOS 26.0` unconditional so Wire's
+// ungated generated graph compiles.
+let proposalSettings: [SwiftSetting] = [
+    .strictMemorySafety(),
+    .enableExperimentalFeature("SuppressedAssociatedTypesWithDefaults"),
+    .enableExperimentalFeature("LifetimeDependence"),
+    .enableExperimentalFeature("Lifetimes"),
+    .enableUpcomingFeature("LifetimeDependence"),
+    .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
+    .enableUpcomingFeature("InferIsolatedConformances"),
+    .enableUpcomingFeature("ExistentialAny"),
+    .enableUpcomingFeature("MemberImportVisibility"),
+    .enableUpcomingFeature("InternalImportsByDefault"),
+]
+
 let package = Package(
     name: "Controllers",
-    platforms: [.macOS(.v15)],
+    platforms: [.macOS(.v26)],
     products: [
         .library(name: "Controllers", targets: ["Controllers"])
     ],
@@ -20,7 +39,8 @@ let package = Package(
             dependencies: [
                 .product(name: "WireMVC", package: "wire-mvc"),
                 .product(name: "Wire", package: "swift-wire"),
-            ]
+            ],
+            swiftSettings: proposalSettings
         )
     ]
 )
