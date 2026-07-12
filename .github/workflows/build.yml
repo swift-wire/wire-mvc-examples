@@ -8,10 +8,12 @@ on:
 
 # Each runtime is its own Swift package (isolated dependency tree), so CI runs a matrix over the
 # packages, each built/linted in its own directory. The examples split across two toolchains:
-#   - Swift 6.3 (released, via SwiftyLab): the ServerTransport-era runtimes — Hummingbird + Vapor —
-#     and the controllers they share, ControllersLegacy.
-#   - Swift 6.4 (nightly container): the proposal-native runtime — SwiftHttpServerExample, on the
-#     swift-http-api-proposal server — and the proposal-native controllers it shares, Controllers.
+#   - Swift 6.3 (released, via SwiftyLab): the ServerTransport-era runtime still on ControllersLegacy —
+#     Vapor — plus ControllersLegacy itself.
+#   - Swift 6.4 (nightly container): the proposal-native runtimes — SwiftHttpServerExample (on the
+#     swift-http-api-proposal server) and Hummingbird (on the proposal-native controllers via the
+#     WireMVCServerTransport adapter, ServerTransport trait enabled in its manifest) — plus the
+#     proposal-native Controllers package.
 # SwiftLint's `lint` parses both, so it runs over every package on a plain runner. (Its `unused_import`
 # analyzer runs only on the 6.3 packages — its SourceKit can't parse the 6.4 build log's flags; the
 # compiler's InternalImportsByDefault covers unused imports on 6.4.)
@@ -21,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [ControllersLegacy, HummingbirdExample, VaporExample]
+        package: [ControllersLegacy, VaporExample]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -49,17 +51,18 @@ jobs:
     name: ${{ matrix.package }} / Swift 6.4 nightly
     # The proposal-native packages are swift-tools-version 6.4 and depend on the (still pre-release)
     # swift-http-api-proposal + swift-http-server, so they build only on the 6.4 toolchain — via the
-    # nightly container, since SwiftyLab/setup-swift installs released toolchains only.
+    # nightly container, since SwiftyLab/setup-swift installs released toolchains only. Hummingbird
+    # enables the wire-mvc `ServerTransport` trait in its manifest, so the adapter is built here too.
     strategy:
       fail-fast: false
       matrix:
-        package: [Controllers, SwiftHttpServerExample]
+        package: [Controllers, HummingbirdExample, SwiftHttpServerExample]
     runs-on: ubuntu-24.04
     container: swiftlang/swift:nightly-6.4.x-noble
     steps:
       - uses: actions/checkout@v6
       - name: Install dependencies
-        run: apt-get update && apt-get install -y libssl-dev
+        run: apt-get update && apt-get install -y libssl-dev libsqlite3-dev
       - name: Build
         working-directory: ${{ matrix.package }}
         run: swift build
@@ -69,7 +72,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        example: [HummingbirdExample, VaporExample]
+        example: [VaporExample]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -79,28 +82,30 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y libssl-dev libsqlite3-dev
       - name: Run
-        # Each example is a real app structured with its framework's testing idiom, so the
-        # end-to-end verification lives in `swift test`: buildApplication/configure bootstraps the
-        # graph (collating the shared ControllersLegacy package across the package boundary), applies
-        # the WireMVC controllers onto the runtime's transport alongside a native route, and drives
-        # every route. Vapor provisions a throwaway Postgres via swift-local-containers (Docker is
-        # preinstalled on the runner); Hummingbird uses in-memory SQLite.
+        # buildApplication/configure bootstraps the graph (collating the shared ControllersLegacy
+        # package across the package boundary), applies the WireMVC controllers onto the runtime's
+        # transport alongside a native route, and drives every route. Vapor provisions a throwaway
+        # Postgres via swift-local-containers (Docker is preinstalled on the runner).
         working-directory: ${{ matrix.example }}
         run: swift test
 
   EndToEnd64:
-    name: End-to-end / SwiftHttpServerExample / Swift 6.4 nightly
+    name: End-to-end / ${{ matrix.example }} / Swift 6.4 nightly
+    strategy:
+      fail-fast: false
+      matrix:
+        example: [HummingbirdExample, SwiftHttpServerExample]
     runs-on: ubuntu-24.04
     container: swiftlang/swift:nightly-6.4.x-noble
     steps:
       - uses: actions/checkout@v6
       - name: Install dependencies
-        run: apt-get update && apt-get install -y libssl-dev
+        run: apt-get update && apt-get install -y libssl-dev libsqlite3-dev
       - name: Run
-        # Bootstraps the graph (collating the shared Controllers package + an in-memory repository),
-        # registers the controllers onto a trie RoutableHTTPServerBuilder, serves them on NIOHTTPServer,
-        # and drives the full todos CRUD lifecycle + /wiring over the loopback.
-        working-directory: SwiftHttpServerExample
+        # Drives every route via the framework's test idiom: Hummingbird bridges the proposal-native
+        # controllers onto its Router via WireMVCServerTransport (HummingbirdTesting + SQLite);
+        # SwiftHttpServerExample serves them on NIOHTTPServer (in-process HTTP + in-memory backend).
+        working-directory: ${{ matrix.example }}
         run: swift test
 
   SwiftFormat63:
@@ -108,7 +113,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [ControllersLegacy, HummingbirdExample, VaporExample]
+        package: [ControllersLegacy, VaporExample]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -128,7 +133,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [Controllers, SwiftHttpServerExample]
+        package: [Controllers, HummingbirdExample, SwiftHttpServerExample]
     runs-on: ubuntu-24.04
     container: swiftlang/swift:nightly-6.4.x-noble
     steps:
@@ -149,7 +154,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [ControllersLegacy, HummingbirdExample, VaporExample, Controllers, SwiftHttpServerExample]
+        package: [ControllersLegacy, VaporExample, Controllers, HummingbirdExample, SwiftHttpServerExample]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6

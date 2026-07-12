@@ -1,10 +1,15 @@
-// swift-tools-version: 6.3
+// swift-tools-version: 6.4
 import PackageDescription
 
-// Runtime 1: Hummingbird — its own package, so its dependency tree (swift-nio, etc.) is isolated
-// from Vapor's and from the http-api-proposal's 6.4 requirement. The shared controllers arrive
-// via a path dependency on ../ControllersLegacy (the ServerTransport-era controllers, until this
-// example migrates to proposal-native WireMVC); only the transport + backend differ.
+// Runtime 1: Hummingbird — proposal-native. Serves the shared (framework-free) controllers via the
+// opt-in WireMVCServerTransport adapter: WireMVC's proposal-native routes are bridged onto Hummingbird's
+// `ServerTransport` (its `Router`, via swift-openapi-hummingbird). Its own package, so its dependency
+// tree stays isolated; the shared controllers arrive via a path dependency on ../Controllers, so this
+// compiles the *same* controller source as the proposal runtime — only the transport + backend differ.
+//
+// swift-tools-version 6.4 + deployment macOS 26 because proposal-native WireMVC requires them. The
+// `ServerTransport` trait is enabled on the wire-mvc dependency to pull in the WireMVCServerTransport
+// adapter (and OpenAPIRuntime).
 //
 // Structured like a real Hummingbird app (as `hummingbird-examples/todos-*` and the Hummingbird
 // template are): `buildApplication` in the target assembles the app, a thin `@main`
@@ -12,10 +17,10 @@ import PackageDescription
 // HummingbirdTesting. Verification lives in the test target, not in `main`.
 let package = Package(
     name: "HummingbirdExample",
-    platforms: [.macOS(.v15)],
+    platforms: [.macOS(.v26)],
     dependencies: [
-        .package(path: "../ControllersLegacy"),
-        .package(url: "https://github.com/tachyonics/wire-mvc.git", branch: "main"),
+        .package(path: "../Controllers"),
+        .package(url: "https://github.com/tachyonics/wire-mvc.git", branch: "main", traits: ["ServerTransport"]),
         .package(url: "https://github.com/tachyonics/swift-wire.git", branch: "main"),
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0"),
         .package(url: "https://github.com/swift-server/swift-openapi-hummingbird.git", from: "2.0.0"),
@@ -26,8 +31,9 @@ let package = Package(
         .executableTarget(
             name: "HummingbirdExample",
             dependencies: [
-                .product(name: "Controllers", package: "ControllersLegacy"),
+                .product(name: "Controllers", package: "Controllers"),
                 .product(name: "WireMVC", package: "wire-mvc"),
+                .product(name: "WireMVCServerTransport", package: "wire-mvc"),
                 .product(name: "Wire", package: "swift-wire"),
                 .product(name: "Hummingbird", package: "hummingbird"),
                 .product(name: "OpenAPIHummingbird", package: "swift-openapi-hummingbird"),
@@ -41,7 +47,7 @@ let package = Package(
             dependencies: [
                 "HummingbirdExample",
                 .product(name: "HummingbirdTesting", package: "hummingbird"),
-                .product(name: "Controllers", package: "ControllersLegacy"),
+                .product(name: "Controllers", package: "Controllers"),
                 .product(name: "Wire", package: "swift-wire"),
             ]
         ),
