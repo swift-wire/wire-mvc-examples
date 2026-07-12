@@ -56,9 +56,11 @@ jobs:
     name: End-to-end / VaporExample (Postgres via Docker) / Swift 6.4 nightly
     # Vapor's integration test provisions a real Postgres via swift-local-containers, so it needs
     # Docker — native on the GitHub ubuntu runner, but unreachable from a container job. So this one
-    # job installs the 6.4 nightly toolchain with Swiftly (using the repo's .swift-version) instead of
-    # the container, keeping Docker native. (When that pinned snapshot is garbage-collected upstream,
-    # bump .swift-version — the container jobs above already track the latest 6.4 nightly.)
+    # job installs the 6.4 nightly toolchain with Swiftly (rather than the container), keeping Docker
+    # native. The snapshot is pinned here because .swift-version is gitignored (not in the checkout);
+    # when it's garbage-collected upstream, bump it — the container jobs above already track latest.
+    env:
+      SWIFT_SNAPSHOT: "6.4.x-snapshot-2026-07-06"
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -67,14 +69,15 @@ jobs:
           curl -L "https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz" | tar zxf -
           ./swiftly init --assume-yes --skip-install
           echo "$HOME/.local/share/swiftly/bin" >> "$GITHUB_PATH"
-          "$HOME/.local/share/swiftly/bin/swiftly" install --use "$(cat .swift-version)"
+          "$HOME/.local/share/swiftly/bin/swiftly" install "$SWIFT_SNAPSHOT" --use --assume-yes
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y libssl-dev libsqlite3-dev
       - name: Run integration test (real Postgres via swift-local-containers)
         # Docker is preinstalled on the ubuntu runner; swift-local-containers pulls postgres:16-alpine,
-        # the graph's @Teardown stops it on shutdown, and VaporTesting drives every route.
+        # the graph's @Teardown stops it on shutdown, and VaporTesting drives every route. Run via
+        # `swiftly run` (Swiftly stays unlinked, so there's no `swift` shim on PATH to rely on).
         working-directory: VaporExample
-        run: swift test
+        run: swiftly run swift test
 
   SwiftFormat:
     name: swift-format / ${{ matrix.package }}
