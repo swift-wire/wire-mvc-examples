@@ -65,7 +65,10 @@ non-zero. Validated on macOS and Linux (see CI).
   (`swift-openapi-vapor` providing `VaporTransport: ServerTransport`); todos are stored in MongoDB
   (MongoKitten, a document store — distinct from Hummingbird's embedded SQL), and the integration test
   provisions a throwaway Mongo container and disconnects it on shutdown via the graph's `@Teardown`.
-- **SwiftHttpServerExample** (proposal) — current (Swift 6.4). Serves the controllers directly over
-  `swift-http-api-proposal`'s `HTTPServer` (swift-server's `NIOHTTPServer`): `@Controller`'s generated
-  witnesses register onto a trie `RoutableHTTPServerBuilder`, which freezes into the server's request
-  handler, with an in-memory `TodoRepository` backend.
+- **SwiftHttpServerExample** (proposal) — current (Swift 6.4, real CouchDB via swift-local-containers).
+  Serves the controllers directly over `swift-http-api-proposal`'s `HTTPServer` (swift-server's
+  `NIOHTTPServer`): `@Controller`'s generated witnesses register onto a trie `RoutableHTTPServerBuilder`,
+  which freezes into the server's request handler. Todos are stored in CouchDB — a document store with a
+  pure HTTP/JSON API — reached with the *proposal's own* `HTTPClient` (the async-http-client backend), so
+  this runtime exercises the proposal on both ends: serving on its server and calling out through its
+  client. The integration test provisions a throwaway CouchDB container.

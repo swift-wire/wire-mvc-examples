@@ -33,12 +33,18 @@ let package = Package(
         .package(url: "https://github.com/swift-server/swift-http-server.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-http-api-proposal.git", .upToNextMinor(from: "0.2.0")),
         .package(
+            url: "https://github.com/swift-server/async-http-client.git",
+            exact: "1.35.0",
+            traits: ["UnstableHTTPAPIsSupport"]
+        ),
+        .package(
             url: "https://github.com/apple/swift-async-algorithms.git",
             exact: "1.1.5",
             traits: ["UnstableAsyncStreaming"]
         ),
         .package(url: "https://github.com/apple/swift-http-types.git", from: "1.6.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.13.2"),
+        .package(url: "https://github.com/tachyonics/swift-local-containers.git", from: "0.10.0"),
     ],
     targets: [
         .executableTarget(
@@ -49,6 +55,8 @@ let package = Package(
                 .product(name: "Wire", package: "swift-wire"),
                 .product(name: "NIOHTTPServer", package: "swift-http-server"),
                 .product(name: "HTTPAPIs", package: "swift-http-api-proposal"),
+                .product(name: "AHCHTTPClient", package: "swift-http-api-proposal"),
+                .product(name: "AsyncHTTPClient", package: "async-http-client"),
                 .product(name: "AsyncStreaming", package: "swift-async-algorithms"),
                 .product(name: "HTTPTypes", package: "swift-http-types"),
                 .product(name: "Logging", package: "swift-log"),
@@ -61,6 +69,10 @@ let package = Package(
             dependencies: [
                 "SwiftHttpServerExample",
                 .product(name: "Controllers", package: "Controllers"),
+                .product(name: "ContainerMacrosLib", package: "swift-local-containers"),
+                .product(name: "ContainerTestSupport", package: "swift-local-containers"),
+                .product(name: "DockerRuntime", package: "swift-local-containers"),
+                .product(name: "LocalContainers", package: "swift-local-containers"),
             ],
             swiftSettings: extraSettings
         ),
