@@ -64,14 +64,16 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+      - name: Install system dependencies
+        # libcurl4-openssl-dev is required by the toolchain itself (Foundation networking on Linux);
+        # install it before Swiftly installs the toolchain, or Swiftly's post-install check fails.
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev libsqlite3-dev libcurl4-openssl-dev
       - name: Install Swiftly + the Swift 6.4 nightly toolchain
         run: |
           curl -L "https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz" | tar zxf -
           ./swiftly init --assume-yes --skip-install
           echo "$HOME/.local/share/swiftly/bin" >> "$GITHUB_PATH"
           "$HOME/.local/share/swiftly/bin/swiftly" install "$SWIFT_SNAPSHOT" --use --assume-yes
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev libsqlite3-dev
       - name: Run integration test (real Postgres via swift-local-containers)
         # Docker is preinstalled on the ubuntu runner; swift-local-containers pulls postgres:16-alpine,
         # the graph's @Teardown stops it on shutdown, and VaporTesting drives every route. Run via
