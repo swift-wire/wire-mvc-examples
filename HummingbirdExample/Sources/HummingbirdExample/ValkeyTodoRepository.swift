@@ -2,7 +2,7 @@ import Controllers
 import Logging
 import Valkey
 import Wire
-import WireMVC  // WireMVCKeys.services (the @Contributes target)
+import WireMVC  // @BackgroundService
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -11,16 +11,18 @@ import Foundation
 #endif
 
 /// The `ValkeyClient` this runtime's backend is built on. It's a `ServiceLifecycle.Service` — its
-/// connection pool lives in a `run()` loop — so it's bound *and* contributed to the graph's services:
+/// connection pool lives in a `run()` loop — so `@BackgroundService` marks it for the graph's services:
 /// constructed once, injected into the repository AND handed to the app's `ServiceGroup`, which runs
 /// it alongside the server and stops it at shutdown. Same instance on both sides (Wire invokes a
 /// `@Provides` function at most once), so the repository and the run loop share one connection pool.
+/// `@BackgroundService` on a `@Provides` function aliases `@Contributes(to: WireMVCKeys.services)`;
+/// `ValkeyClient` already conforms to `Service`, so no conformance is added.
 ///
 /// Connection config comes from the environment, 12-factor style — the test exports the container's
 /// host/port; a real deployment sets them however it manages config. The client doesn't connect here;
 /// it connects when the service group runs it.
 @Provides
-@Contributes(to: WireMVCKeys.services)
+@BackgroundService
 func provideValkeyClient() -> ValkeyClient {
     let environment = ProcessInfo.processInfo.environment
     let host = environment["VALKEY_HOST"] ?? "localhost"
