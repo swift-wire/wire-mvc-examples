@@ -98,11 +98,21 @@ struct TodosRoutingTests {
             #expect(patchStatus == 200)
             #expect(try JSONDecoder().decode(Todo.self, from: patchData).completed == true)
 
-            // GET /todos/stream (@RawRoute) — the raw handler streams the todos as SSE. Reaching this
-            // route (rather than get(id: "stream")) confirms the trie prefers the literal over `{id}`.
+            // GET /todos/stream (@RawRoute) — the raw handler streams one SSE event per todo. Create a
+            // second todo first so the stream is genuinely more than one write; assert both events are
+            // present (order isn't guaranteed across backends) and that there are exactly two, then
+            // remove the second to restore single-todo state. Reaching this route (rather than
+            // get(id: "stream")) also confirms the trie prefers the literal over `{id}`.
+            let (_, created2Data) = try await send(
+                "POST", "/todos", port: port, contentType: "application/json", body: Data(#"{"title":"Walk dog"}"#.utf8)
+            )
+            let created2 = try JSONDecoder().decode(Todo.self, from: created2Data)
             let (streamStatus, streamData) = try await send("GET", "/todos/stream", port: port)
+            let events = String(decoding: streamData, as: UTF8.self)
             #expect(streamStatus == 200)
-            #expect(String(decoding: streamData, as: UTF8.self) == "data: \(created.id)\n\n")
+            #expect(events.contains("data: \(created.id)\n\n") && events.contains("data: \(created2.id)\n\n"))
+            #expect(events.components(separatedBy: "\n\n").filter { !$0.isEmpty }.count == 2)
+            _ = try await send("DELETE", "/todos/\(created2.id)", port: port)
 
             // GET /todos?completed=… (@Query) — the todo is completed after the PATCH.
             let (qTrue, qTrueData) = try await send("GET", "/todos?completed=true", port: port)

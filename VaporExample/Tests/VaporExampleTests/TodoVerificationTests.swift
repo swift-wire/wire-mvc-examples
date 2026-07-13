@@ -102,9 +102,16 @@ struct TodoVerificationTests {
             #expect(try decode(Todo.self, patched).completed)
 
             // WireMVC: @RawRoute SSE — streamed through the WireMVCServerTransport bridge onto Vapor.
+            // A second todo makes it a genuine multi-event stream; assert both events are present (order
+            // isn't guaranteed) and that there are exactly two, then remove the second.
+            let created2 = try await execute(.POST, "/todos", json: true, body: #"{"title":"Walk dog"}"#)
+            let todo2 = try decode(Todo.self, created2)
             let stream = try await execute(.GET, "/todos/stream")
+            let events = String(buffer: stream.body)
             #expect(stream.status == .ok)
-            #expect(String(buffer: stream.body) == "data: \(todo.id)\n\n")
+            #expect(events.contains("data: \(todo.id)\n\n") && events.contains("data: \(todo2.id)\n\n"))
+            #expect(events.components(separatedBy: "\n\n").filter { !$0.isEmpty }.count == 2)
+            _ = try await execute(.DELETE, "/todos/\(todo2.id)")
 
             // WireMVC: @Query (completed, after the PATCH) and @Header (x-limit caps the list).
             let qTrue = try await execute(.GET, "/todos?completed=true")
