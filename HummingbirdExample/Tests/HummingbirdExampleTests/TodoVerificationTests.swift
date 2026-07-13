@@ -100,6 +100,21 @@ struct TodoVerificationTests {
             #expect(patched.status == .ok)
             #expect(try decode(Todo.self, patched).completed)
 
+            // WireMVC: @RawRoute SSE — streamed through the WireMVCServerTransport bridge onto Hummingbird.
+            let stream = try await client.execute(uri: "/todos/stream", method: .get)
+            #expect(stream.status == .ok)
+            #expect(String(decoding: stream.body.readableBytesView, as: UTF8.self) == "data: \(todo.id)\n\n")
+
+            // WireMVC: @Query (completed, after the PATCH) and @Header (x-limit caps the list).
+            let qTrue = try await client.execute(uri: "/todos?completed=true", method: .get)
+            #expect(try decode([Todo].self, qTrue).count == 1)
+            let qFalse = try await client.execute(uri: "/todos?completed=false", method: .get)
+            #expect(try decode([Todo].self, qFalse).isEmpty)
+            let limited = try await client.execute(
+                uri: "/todos", method: .get, headers: [HTTPField.Name("x-limit")!: "0"]
+            )
+            #expect(try decode([Todo].self, limited).isEmpty)
+
             // WireMVC: delete (@ResponseStatus).
             let deleted = try await client.execute(uri: "/todos/\(todo.id)", method: .delete)
             #expect(deleted.status == .noContent)

@@ -61,14 +61,16 @@ struct TodoVerificationTests {
                 _ method: HTTPMethod,
                 _ path: String,
                 json: Bool = false,
+                extraHeaders: [String: String] = [:],
                 body: String? = nil
             ) async throws -> TestingHTTPResponse {
                 var headers = HTTPHeaders()
                 if json { headers.contentType = .json }
+                for (name, value) in extraHeaders { headers.add(name: name, value: value) }
                 return try await tester.performTest(
                     request: TestingHTTPRequest(
                         method: method,
-                        url: URI(path: path),
+                        url: URI(string: path),  // string init parses the query so @Query binds
                         headers: headers,
                         body: body.map { ByteBuffer(string: $0) } ?? ByteBuffer()
                     )
@@ -98,6 +100,19 @@ struct TodoVerificationTests {
             let patched = try await execute(.PATCH, "/todos/\(todo.id)", json: true, body: #"{"completed":true}"#)
             #expect(patched.status == .ok)
             #expect(try decode(Todo.self, patched).completed)
+
+            // WireMVC: @RawRoute SSE — streamed through the WireMVCServerTransport bridge onto Vapor.
+            let stream = try await execute(.GET, "/todos/stream")
+            #expect(stream.status == .ok)
+            #expect(String(buffer: stream.body) == "data: \(todo.id)\n\n")
+
+            // WireMVC: @Query (completed, after the PATCH) and @Header (x-limit caps the list).
+            let qTrue = try await execute(.GET, "/todos?completed=true")
+            #expect(try decode([Todo].self, qTrue).count == 1)
+            let qFalse = try await execute(.GET, "/todos?completed=false")
+            #expect(try decode([Todo].self, qFalse).isEmpty)
+            let limited = try await execute(.GET, "/todos", extraHeaders: ["x-limit": "0"])
+            #expect(try decode([Todo].self, limited).isEmpty)
 
             // WireMVC: delete (@ResponseStatus).
             let deleted = try await execute(.DELETE, "/todos/\(todo.id)")

@@ -31,6 +31,12 @@ controller source — that's what makes it a genuine cross-runtime proof rather 
   onto a `some ServerTransport` for Hummingbird/Vapor, `WireMVC.apply` onto a `some
   RoutableHTTPServerBuilder` (a trie router) for the proposal runtime. WireMVC stays
   router/transport-agnostic.
+- **The full annotation surface, including raw streaming.** The shared controller exercises the typed
+  surface — `@Path`/`@Query`/`@JSONBody`/`@Header`, `@JSONResponse`/`@ResponseStatus` — plus one
+  **`@RawRoute`** route (`GET /todos/stream`) that is handed the response sender verbatim and writes
+  server-sent events itself (no decode/encode). It streams natively on the proposal server and through
+  the `WireMVCServerTransport` bridge on Hummingbird and Vapor, so the raw/streaming path is exercised
+  on every runtime.
 - **Coexistence.** The ServerTransport runtimes also register a *native* route the framework's own
   way (`/health`), on the same router — WireMVC registers *onto* the app's transport, it doesn't own
   the router (collation, not registration).

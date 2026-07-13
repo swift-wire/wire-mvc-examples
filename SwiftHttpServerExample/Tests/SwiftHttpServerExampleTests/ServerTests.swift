@@ -98,6 +98,23 @@ struct TodosRoutingTests {
             #expect(patchStatus == 200)
             #expect(try JSONDecoder().decode(Todo.self, from: patchData).completed == true)
 
+            // GET /todos/stream (@RawRoute) — the raw handler streams the todos as SSE. Reaching this
+            // route (rather than get(id: "stream")) confirms the trie prefers the literal over `{id}`.
+            let (streamStatus, streamData) = try await send("GET", "/todos/stream", port: port)
+            #expect(streamStatus == 200)
+            #expect(String(decoding: streamData, as: UTF8.self) == "data: \(created.id)\n\n")
+
+            // GET /todos?completed=… (@Query) — the todo is completed after the PATCH.
+            let (qTrue, qTrueData) = try await send("GET", "/todos?completed=true", port: port)
+            let qTrueList = try JSONDecoder().decode([Todo].self, from: qTrueData)
+            #expect(qTrue == 200 && qTrueList.count == 1)
+            let (_, qFalseData) = try await send("GET", "/todos?completed=false", port: port)
+            #expect(try JSONDecoder().decode([Todo].self, from: qFalseData).isEmpty)
+
+            // GET /todos with x-limit: 0 (@Header) — caps the list to nothing.
+            let (_, limitedData) = try await send("GET", "/todos", port: port, headers: ["x-limit": "0"])
+            #expect(try JSONDecoder().decode([Todo].self, from: limitedData).isEmpty)
+
             // DELETE /todos/{id} (@ResponseStatus(.noContent))
             let (deleteStatus, _) = try await send("DELETE", "/todos/\(created.id)", port: port)
             #expect(deleteStatus == 204)
@@ -125,11 +142,13 @@ func send(
     _ path: String,
     port: Int,
     contentType: String? = nil,
+    headers: [String: String] = [:],
     body: Data? = nil
 ) async throws -> (status: Int, body: Data) {
     var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)\(path)")!)
     request.httpMethod = method
     if let contentType { request.setValue(contentType, forHTTPHeaderField: "Content-Type") }
+    for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
     request.httpBody = body
     let (data, response) = try await URLSession.shared.data(for: request)
     return ((response as? HTTPURLResponse)?.statusCode ?? -1, data)

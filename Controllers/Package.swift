@@ -32,6 +32,12 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/tachyonics/wire-mvc.git", branch: "main"),
         .package(url: "https://github.com/tachyonics/swift-wire.git", branch: "main"),
+        // The `@RawRoute` streaming route touches the proposal's raw HTTP primitives directly
+        // (`HTTPResponseSender`, `HTTPResponse`, `HTTPFields`, `UniqueArray`) — inherent to a raw
+        // handler. Still framework-free: these are the proposal's HTTP types, not Hummingbird/Vapor.
+        .package(url: "https://github.com/apple/swift-http-api-proposal.git", .upToNextMinor(from: "0.2.0")),
+        .package(url: "https://github.com/apple/swift-http-types.git", from: "1.6.0"),
+        .package(url: "https://github.com/apple/swift-collections.git", from: "1.6.0"),
     ],
     targets: [
         .target(
@@ -39,6 +45,9 @@ let package = Package(
             dependencies: [
                 .product(name: "WireMVC", package: "wire-mvc"),
                 .product(name: "Wire", package: "swift-wire"),
+                .product(name: "HTTPAPIs", package: "swift-http-api-proposal"),
+                .product(name: "HTTPTypes", package: "swift-http-types"),
+                .product(name: "BasicContainers", package: "swift-collections"),
             ],
             swiftSettings: proposalSettings
         )
