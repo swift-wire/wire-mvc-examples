@@ -100,6 +100,35 @@ struct TodoVerificationTests {
             #expect(patched.status == .ok)
             #expect(try decode(Todo.self, patched).completed)
 
+            // WireMVC: @RawRoute SSE — streamed through the WireMVCServerTransport bridge onto Hummingbird.
+            // A second todo makes it a genuine multi-event stream; assert both events are present (order
+            // isn't guaranteed) and that there are exactly two, then remove the second.
+            let created2 = try await client.execute(
+                uri: "/todos",
+                method: .post,
+                headers: json,
+                body: ByteBuffer(string: #"{"title":"Walk dog"}"#)
+            )
+            let todo2 = try decode(Todo.self, created2)
+            let stream = try await client.execute(uri: "/todos/stream", method: .get)
+            let events = String(decoding: stream.body.readableBytesView, as: UTF8.self)
+            #expect(stream.status == .ok)
+            #expect(events.contains("data: \(todo.id)\n\n") && events.contains("data: \(todo2.id)\n\n"))
+            #expect(events.components(separatedBy: "\n\n").filter { !$0.isEmpty }.count == 2)
+            _ = try await client.execute(uri: "/todos/\(todo2.id)", method: .delete)
+
+            // WireMVC: @Query (completed, after the PATCH) and @Header (x-limit caps the list).
+            let qTrue = try await client.execute(uri: "/todos?completed=true", method: .get)
+            #expect(try decode([Todo].self, qTrue).count == 1)
+            let qFalse = try await client.execute(uri: "/todos?completed=false", method: .get)
+            #expect(try decode([Todo].self, qFalse).isEmpty)
+            let limited = try await client.execute(
+                uri: "/todos",
+                method: .get,
+                headers: [HTTPField.Name("x-limit")!: "0"]
+            )
+            #expect(try decode([Todo].self, limited).isEmpty)
+
             // WireMVC: delete (@ResponseStatus).
             let deleted = try await client.execute(uri: "/todos/\(todo.id)", method: .delete)
             #expect(deleted.status == .noContent)

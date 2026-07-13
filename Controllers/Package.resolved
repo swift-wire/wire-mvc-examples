@@ -1,5 +1,5 @@
 {
-  "originHash" : "e59e3129a84a273237e0a5813f8f3b7fbd7d4fff5528b85128c92ce89702d930",
+  "originHash" : "a18ec23526e6cd2e76d3d0c5711065a736af47a76793bafc0e75719f35f21b14",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -224,6 +224,15 @@
       "state" : {
         "branch" : "main",
         "revision" : "b8103afee9634510b3a90b101ec34535b555255c"
+      }
+    },
+    {
+      "identity" : "wire-mvc",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tachyonics/wire-mvc.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "18d827bb7351095768764446411345519afa6b58"
       }
     }
   ],
