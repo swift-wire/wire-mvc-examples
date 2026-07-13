@@ -104,7 +104,11 @@ struct TodosRoutingTests {
             // remove the second to restore single-todo state. Reaching this route (rather than
             // get(id: "stream")) also confirms the trie prefers the literal over `{id}`.
             let (_, created2Data) = try await send(
-                "POST", "/todos", port: port, contentType: "application/json", body: Data(#"{"title":"Walk dog"}"#.utf8)
+                "POST",
+                "/todos",
+                port: port,
+                contentType: "application/json",
+                body: Data(#"{"title":"Walk dog"}"#.utf8)
             )
             let created2 = try JSONDecoder().decode(Todo.self, from: created2Data)
             let (streamStatus, streamData) = try await send("GET", "/todos/stream", port: port)

@@ -104,7 +104,10 @@ struct TodoVerificationTests {
             // A second todo makes it a genuine multi-event stream; assert both events are present (order
             // isn't guaranteed) and that there are exactly two, then remove the second.
             let created2 = try await client.execute(
-                uri: "/todos", method: .post, headers: json, body: ByteBuffer(string: #"{"title":"Walk dog"}"#)
+                uri: "/todos",
+                method: .post,
+                headers: json,
+                body: ByteBuffer(string: #"{"title":"Walk dog"}"#)
             )
             let todo2 = try decode(Todo.self, created2)
             let stream = try await client.execute(uri: "/todos/stream", method: .get)
