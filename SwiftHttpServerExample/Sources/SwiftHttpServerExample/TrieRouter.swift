@@ -31,6 +31,7 @@ where
     typealias Handler =
         @Sendable (
             HTTPRequest,
+            consuming RequestContext,
             [String: Substring],
             consuming sending Reader,
             consuming sending ResponseSender
@@ -172,7 +173,7 @@ where
             }
         }
         if matched, let handler = nodes[current].handlers.first(where: { $0.method == request.method })?.handler {
-            try await handler(request, parameters, reader, responseSender)
+            try await handler(request, requestContext, parameters, reader, responseSender)
         } else {
             try await responseSender.sendAndFinish(HTTPResponse(status: .notFound))
         }
