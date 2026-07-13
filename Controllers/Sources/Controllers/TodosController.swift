@@ -1,9 +1,8 @@
-public import Wire
-public import WireMVC
-
 import BasicContainers
 import HTTPAPIs
 import HTTPTypes
+public import Wire
+public import WireMVC
 
 /// The portable todos controller — identical across every runtime executable. It depends only
 /// on the `TodoRepository` protocol and WireMVC's declarative annotations; nothing

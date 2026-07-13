@@ -111,7 +111,9 @@ struct TodoVerificationTests {
             let qFalse = try await client.execute(uri: "/todos?completed=false", method: .get)
             #expect(try decode([Todo].self, qFalse).isEmpty)
             let limited = try await client.execute(
-                uri: "/todos", method: .get, headers: [HTTPField.Name("x-limit")!: "0"]
+                uri: "/todos",
+                method: .get,
+                headers: [HTTPField.Name("x-limit")!: "0"]
             )
             #expect(try decode([Todo].self, limited).isEmpty)
 
