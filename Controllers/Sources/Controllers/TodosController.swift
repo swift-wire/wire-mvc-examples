@@ -14,6 +14,7 @@ public import WireMVC
 /// `RoutableHTTPServerBuilder` (the runtime's router).
 @Singleton
 @Controller("/todos")
+@Middleware(LogRequests<WireContext, WireReader, WireSender>.self)  // controller-scope: every route
 public struct TodosController<Repository: TodoRepository>: Sendable {
     @Inject var repository: Repository
 
@@ -54,6 +55,7 @@ public struct TodosController<Repository: TodoRepository>: Sendable {
 
     @Delete("/{id}")
     @ResponseStatus(.noContent)
+    @Middleware(RequireAPIKey<WireContext, WireReader, WireSender>.self)  // route-scope gate
     public func delete(@Path id: String) async throws {
         try await repository.delete(id: id)
     }
@@ -66,7 +68,7 @@ public struct TodosController<Repository: TodoRepository>: Sendable {
     @Get("/stream")
     @RawRoute
     public func stream<Sender: HTTPResponseSender & ~Copyable & SendableMetatype>(
-        responseSender: consuming sending Sender
+        responseSender: consuming Sender
     ) async throws where Sender.Writer: ~Copyable {
         var fields = HTTPFields()
         fields[.contentType] = "text/event-stream"

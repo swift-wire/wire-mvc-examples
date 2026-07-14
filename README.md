@@ -37,6 +37,12 @@ controller source — that's what makes it a genuine cross-runtime proof rather 
   server-sent events itself (no decode/encode). It streams natively on the proposal server and through
   the `WireMVCServerTransport` bridge on Hummingbird and Vapor, so the raw/streaming path is exercised
   on every runtime.
+- **Middleware, as a chain.** The shared controller carries a controller-scope
+  **`@Middleware(LogRequests<…>)`** (observability — runs on every route) and a route-scope
+  **`@Middleware(RequireAPIKey<…>)`** on `DELETE /todos/{id}` (a gate). Without an `x-api-key` header the
+  gate *handles the request itself* — writes a 401, and the route handler is skipped — while the
+  controller-scope middleware still runs (every middleware runs; the "decision" is state carried in the
+  box, not a control-flow short-circuit). Identical middleware source, exercised on all three runtimes.
 - **Coexistence.** The ServerTransport runtimes also register a *native* route the framework's own
   way (`/health`), on the same router — WireMVC registers *onto* the app's transport, it doesn't own
   the router (collation, not registration).
