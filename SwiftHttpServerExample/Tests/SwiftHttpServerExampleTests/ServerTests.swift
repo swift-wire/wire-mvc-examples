@@ -141,7 +141,11 @@ struct TodosRoutingTests {
 
             // DELETE /todos/{id} (@ResponseStatus(.noContent)) — with the key the handler runs.
             let (deleteStatus, _) = try await send(
-                "DELETE", "/todos/\(created.id)", port: port, headers: ["x-api-key": "secret"])
+                "DELETE",
+                "/todos/\(created.id)",
+                port: port,
+                headers: ["x-api-key": "secret"]
+            )
             #expect(deleteStatus == 204)
 
             // GET /todos — now empty
