@@ -115,7 +115,11 @@ struct TodoVerificationTests {
             #expect(stream.status == .ok)
             #expect(events.contains("data: \(todo.id)\n\n") && events.contains("data: \(todo2.id)\n\n"))
             #expect(events.components(separatedBy: "\n\n").filter { !$0.isEmpty }.count == 2)
-            _ = try await client.execute(uri: "/todos/\(todo2.id)", method: .delete)
+            _ = try await client.execute(
+                uri: "/todos/\(todo2.id)",
+                method: .delete,
+                headers: [HTTPField.Name("x-api-key")!: "secret"]
+            )
 
             // WireMVC: @Query (completed, after the PATCH) and @Header (x-limit caps the list).
             let qTrue = try await client.execute(uri: "/todos?completed=true", method: .get)
@@ -129,8 +133,17 @@ struct TodoVerificationTests {
             )
             #expect(try decode([Todo].self, limited).isEmpty)
 
+            // DELETE is guarded by the route-scope @Middleware(RequireAPIKey). Without the key the gate
+            // handles the request — 401, handler skipped (Model B); with it, the handler runs.
+            let rejected = try await client.execute(uri: "/todos/\(todo.id)", method: .delete)
+            #expect(rejected.status == .unauthorized)
+
             // WireMVC: delete (@ResponseStatus).
-            let deleted = try await client.execute(uri: "/todos/\(todo.id)", method: .delete)
+            let deleted = try await client.execute(
+                uri: "/todos/\(todo.id)",
+                method: .delete,
+                headers: [HTTPField.Name("x-api-key")!: "secret"]
+            )
             #expect(deleted.status == .noContent)
 
             let empty = try await client.execute(uri: "/todos", method: .get)

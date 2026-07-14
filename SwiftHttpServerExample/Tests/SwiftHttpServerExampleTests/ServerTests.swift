@@ -4,6 +4,7 @@ import Controllers
 import Foundation
 import LocalContainers
 import NIOHTTPServer
+import Synchronization  // the LogRequests observe-middleware counter
 import Testing
 
 @testable import SwiftHttpServerExample
@@ -116,7 +117,7 @@ struct TodosRoutingTests {
             #expect(streamStatus == 200)
             #expect(events.contains("data: \(created.id)\n\n") && events.contains("data: \(created2.id)\n\n"))
             #expect(events.components(separatedBy: "\n\n").filter { !$0.isEmpty }.count == 2)
-            _ = try await send("DELETE", "/todos/\(created2.id)", port: port)
+            _ = try await send("DELETE", "/todos/\(created2.id)", port: port, headers: ["x-api-key": "secret"])
 
             // GET /todos?completed=… (@Query) — the todo is completed after the PATCH.
             let (qTrue, qTrueData) = try await send("GET", "/todos?completed=true", port: port)
@@ -129,8 +130,22 @@ struct TodosRoutingTests {
             let (_, limitedData) = try await send("GET", "/todos", port: port, headers: ["x-limit": "0"])
             #expect(try JSONDecoder().decode([Todo].self, from: limitedData).isEmpty)
 
-            // DELETE /todos/{id} (@ResponseStatus(.noContent))
-            let (deleteStatus, _) = try await send("DELETE", "/todos/\(created.id)", port: port)
+            // DELETE is guarded by the route-scope @Middleware(RequireAPIKey). Without the key the gate
+            // handles the request itself — 401, the handler never runs (Model B short-circuit). The
+            // controller-scope @Middleware(LogRequests) still runs for this rejected request, so its
+            // counter advances — "every middleware runs" even past a gate.
+            let observedBefore = requestObservations.load(ordering: .relaxed)
+            let (rejected, _) = try await send("DELETE", "/todos/\(created.id)", port: port)
+            #expect(rejected == 401)
+            #expect(requestObservations.load(ordering: .relaxed) > observedBefore)
+
+            // DELETE /todos/{id} (@ResponseStatus(.noContent)) — with the key the handler runs.
+            let (deleteStatus, _) = try await send(
+                "DELETE",
+                "/todos/\(created.id)",
+                port: port,
+                headers: ["x-api-key": "secret"]
+            )
             #expect(deleteStatus == 204)
 
             // GET /todos — now empty
