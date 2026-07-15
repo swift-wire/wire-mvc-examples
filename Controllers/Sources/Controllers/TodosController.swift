@@ -55,7 +55,7 @@ public struct TodosController<Repository: TodoRepository>: Sendable {
 
     @Delete("/{id}")
     @ResponseStatus(.noContent)
-    @Middleware(RequireAPIKey<WireContext, WireReader, WireSender>.self)  // route-scope gate
+    @Middleware(RequireAPIKeyKeys.factory)  // route-scope gate — generic-with-deps, factory-lifted by key
     public func delete(@Path id: String) async throws {
         try await repository.delete(id: id)
     }
