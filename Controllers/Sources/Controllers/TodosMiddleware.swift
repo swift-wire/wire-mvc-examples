@@ -1,5 +1,21 @@
 public import Synchronization
+public import Wire
 public import WireMVC
+
+/// A concrete dependency the `RequireAPIKey` gate injects — the set of accepted API keys. An ordinary
+/// `@Singleton`, resolved into every runtime's graph. A real one would read a secret store.
+@Singleton
+public struct APIKeyStore: Sendable {
+    let accepted: Set<String> = ["secret"]
+    public func isValid(_ key: String) -> Bool { accepted.contains(key) }
+}
+
+/// Factory-key namespace for the `RequireAPIKey` gate. A generic type can't host a `static let` key,
+/// so the key lives on a small non-generic namespace; the middleware is `@Factory(RequireAPIKeyKeys
+/// .factory)` and consumed `@Middleware(RequireAPIKeyKeys.factory)`.
+public enum RequireAPIKeyKeys {
+    public static let factory = FactoryKey()
+}
 
 /// A global request counter the `LogRequests` middleware bumps. Public so each runtime's test can
 /// assert the middleware ran (a real one would log or emit a metric).
@@ -28,25 +44,29 @@ where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields?, Sender.Wr
     }
 }
 
-/// Route-scope gate middleware: if the `x-api-key` header isn't `secret`, it handles the request itself
-/// by writing a 401 (consuming the sender); the box becomes `.responded`, so the route's handler is
-/// skipped. It still calls `next` — every middleware runs — it just forwards an already-responded box.
+/// Route-scope gate middleware, now **generic-with-deps**: it `@Inject`s an `APIKeyStore` to validate
+/// the `x-api-key` header, rather than hard-coding the key. `@Factory` makes it a factory template the
+/// build plugin synthesises and lifts onto the controller (referenced `@Middleware(RequireAPIKeyKeys
+/// .factory)`). Model B: if the key is invalid it writes a 401 itself (consuming the sender), the box
+/// becomes `.responded`, and the handler is skipped — it still calls `next`, every middleware runs.
+@Factory(RequireAPIKeyKeys.factory)
 public struct RequireAPIKey<
     Ctx: HTTPServerCapability.RequestContext & ~Copyable,
     Reader: AsyncReader & ~Copyable,
     Sender: HTTPResponseSender & ~Copyable
 >: Middleware
 where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields?, Sender.Writer: ~Copyable {
+    @Inject var keys: APIKeyStore
+
     public typealias Input = RequestResponseMiddlewareBox<Ctx, Reader, Sender>
     public typealias NextInput = Input
-
-    public init() {}
 
     public func intercept<Return: ~Copyable>(
         input: consuming Input,
         next: (consuming NextInput) async throws -> Return
     ) async throws -> Return {
-        let authorized = input.peekedRequest.headerFields[HTTPField.Name("x-api-key")!] == "secret"
+        let presented = input.peekedRequest.headerFields[HTTPField.Name("x-api-key")!] ?? ""
+        let authorized = keys.isValid(presented)
         guard input.isPending, !authorized else {
             return try await next(input)
         }
