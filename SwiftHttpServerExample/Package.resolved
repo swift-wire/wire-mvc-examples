@@ -295,7 +295,7 @@
       "location" : "https://github.com/tachyonics/swift-wire.git",
       "state" : {
         "branch" : "main",
-        "revision" : "fbfdc9fe2e05805b2ef38e8c4c868fb6399db39d"
+        "revision" : "7797a1166dd417497a8e1977d1ee2b162a71e198"
       }
     },
     {
@@ -304,7 +304,7 @@
       "location" : "https://github.com/tachyonics/wire-mvc.git",
       "state" : {
         "branch" : "main",
-        "revision" : "751288c77ac87dda61dca498476034b312c60b34"
+        "revision" : "decd2f4bd60b0a399dd36aaec111f708cf551739"
       }
     },
     {
