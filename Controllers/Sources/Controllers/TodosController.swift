@@ -15,6 +15,7 @@ public import WireMVC
 @Singleton
 @Controller("/todos")
 @Middleware(LogRequests<WireContext, WireReader, WireSender>.self)  // controller-scope: every route
+@Middleware(AuditKeys.factory)  // controller-scope, generic-with-deps, non-canonical parameter order
 public struct TodosController<Repository: TodoRepository>: Sendable {
     @Inject var repository: Repository
 
