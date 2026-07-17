@@ -1,5 +1,5 @@
 {
-  "originHash" : "99bdbbb6271ae4e7b222b36c8aaa54e3929968b83010016c6097282edea38d62",
+  "originHash" : "a63b69989467327fd7ee0520a652125583e99be2a671cd8259428320dc9d63ad",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -322,7 +322,7 @@
       "location" : "https://github.com/tachyonics/swift-wire.git",
       "state" : {
         "branch" : "main",
-        "revision" : "665086a04910e3a6dd9fb07f963aaed61be9f638"
+        "revision" : "85abeebbdd6f9ad17a2b8fccc3b55162357abd75"
       }
     },
     {
@@ -340,7 +340,7 @@
       "location" : "https://github.com/tachyonics/wire-mvc.git",
       "state" : {
         "branch" : "main",
-        "revision" : "cb0c7fe5a97eca6b5340eefe53e33d7184afeded"
+        "revision" : "11f6271cd7794a84b5d840e3572fe7da65bfea3d"
       }
     },
     {

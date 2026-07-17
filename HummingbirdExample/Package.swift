@@ -45,7 +45,7 @@ let package = Package(
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
-            plugins: [.plugin(name: "WireBuildPlugin", package: "swift-wire")]
+            plugins: [.plugin(name: "WireMVCBuildPlugin", package: "wire-mvc")]
         ),
         // The integration test provisions a throwaway Valkey via swift-local-containers'
         // test-support macros (`@Containers`/`@Container` + `containerTrait`), then drives the routes
