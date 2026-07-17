@@ -49,8 +49,7 @@ let package = Package(
                 .product(name: "HTTPTypes", package: "swift-http-types"),
                 .product(name: "BasicContainers", package: "swift-collections"),
             ],
-            swiftSettings: proposalSettings,
-            plugins: [.plugin(name: "WireContributorPlugin", package: "swift-wire")]
+            swiftSettings: proposalSettings
         )
     ]
 )
