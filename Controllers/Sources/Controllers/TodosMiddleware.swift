@@ -10,11 +10,20 @@ public struct APIKeyStore: Sendable {
     public func isValid(_ key: String) -> Bool { accepted.contains(key) }
 }
 
-/// Factory-key namespace for the `RequireAPIKey` gate. A generic type can't host a `static let` key,
-/// so the key lives on a small non-generic namespace; the middleware is `@Factory(RequireAPIKeyKeys
-/// .factory)` and consumed `@Middleware(RequireAPIKeyKeys.factory)`.
-public enum RequireAPIKeyKeys {
-    public static let factory = FactoryKey()
+// The application's middleware key catalogue, grouped by the scope each middleware is applied at. A
+// generic middleware type can't host its own `static let` key, so the keys live on these non-generic
+// namespaces; a template is declared `@Factory(ControllerMiddleware.logRequests)` and consumed with the
+// matching `@Middleware(ControllerMiddleware.logRequests)`.
+
+/// Keys for middleware applied controller-wide (every route).
+public enum ControllerMiddleware {
+    public static let logRequests = FactoryKey()
+    public static let audit = FactoryKey()
+}
+
+/// Keys for middleware applied to a single route.
+public enum RouteMiddleware {
+    public static let requireAPIKey = FactoryKey()
 }
 
 /// A global request counter the `LogRequests` middleware bumps. Public so each runtime's test can
@@ -30,17 +39,12 @@ public struct AuditLog: Sendable {
     public func record() { auditObservations.add(1, ordering: .relaxed) }
 }
 
-/// Factory-key namespace for the `AuditGate` middleware.
-public enum AuditKeys {
-    public static let factory = FactoryKey()
-}
-
 /// A generic-with-deps middleware over the box roles, declared in a **non-canonical order** —
 /// `<Sender, Reader, Ctx>` — with `@MiddlewareFactory(.responseSender, .reader, .requestContext)` mapping
 /// them positionally, plus an **injected** `Repository`: it shares the controller's `TodoRepository`
 /// backend, resolved once and threaded to both through the same lifted generic (the injected axis).
 /// Behaviourally a dep-carrying observer: counts each request, forwards the box.
-@Factory(AuditKeys.factory)
+@Factory(ControllerMiddleware.audit)
 @MiddlewareFactory(.responseSender, .reader, .requestContext)
 public struct AuditGate<
     Sender: HTTPResponseSender & ~Copyable,
@@ -66,7 +70,10 @@ where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields?, Sender.Wr
 
 /// Controller-scope observability middleware: it counts every request and forwards the box untouched.
 /// It always runs — even for requests an inner gate short-circuits — which is the point of the model.
-/// Generic and dep-free, so it's named `@Middleware(LogRequests<WireContext, WireReader, WireSender>.self)`.
+/// Generic but dep-free; `@Factory` makes it a factory template consumed with
+/// `@Middleware(ControllerMiddleware.logRequests)`.
+@Factory(ControllerMiddleware.logRequests)
+@MiddlewareFactory  // bare → positional: <Ctx, Reader, Sender> map to the box roles in order (canonical)
 public struct LogRequests<
     Ctx: HTTPServerCapability.RequestContext & ~Copyable,
     Reader: AsyncReader & ~Copyable,
@@ -75,8 +82,6 @@ public struct LogRequests<
 where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields?, Sender.Writer: ~Copyable {
     public typealias Input = RequestResponseMiddlewareBox<Ctx, Reader, Sender>
     public typealias NextInput = Input
-
-    public init() {}
 
     public func intercept<Return: ~Copyable>(
         input: consuming Input,
@@ -89,10 +94,11 @@ where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields?, Sender.Wr
 
 /// Route-scope gate middleware, now **generic-with-deps**: it `@Inject`s an `APIKeyStore` to validate
 /// the `x-api-key` header, rather than hard-coding the key. `@Factory` makes it a factory template the
-/// build plugin synthesises and lifts onto the controller (referenced `@Middleware(RequireAPIKeyKeys
-/// .factory)`). Model B: if the key is invalid it writes a 401 itself (consuming the sender), the box
-/// becomes `.responded`, and the handler is skipped — it still calls `next`, every middleware runs.
-@Factory(RequireAPIKeyKeys.factory)
+/// build plugin synthesises and lifts onto the controller (referenced
+/// `@Middleware(RouteMiddleware.requireAPIKey)`). Model B: if the key is invalid it writes a 401 itself
+/// (consuming the sender), the box becomes `.responded`, and the handler is skipped — it still calls
+/// `next`, every middleware runs.
+@Factory(RouteMiddleware.requireAPIKey)
 @MiddlewareFactory  // bare → positional: <Ctx, Reader, Sender> map to the box roles in order (canonical)
 public struct RequireAPIKey<
     Ctx: HTTPServerCapability.RequestContext & ~Copyable,
