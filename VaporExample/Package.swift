@@ -45,7 +45,7 @@ let package = Package(
                 // conformance references `any Service`.
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
             ],
-            plugins: [.plugin(name: "WireBuildPlugin", package: "swift-wire")]
+            plugins: [.plugin(name: "WireMVCBuildPlugin", package: "wire-mvc")]
         ),
         // The integration test provisions a throwaway MongoDB via swift-local-containers'
         // test-support macros (`@Containers`/`@Container` + `containerTrait`), then drives the

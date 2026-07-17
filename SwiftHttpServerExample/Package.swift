@@ -67,7 +67,7 @@ let package = Package(
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
             ],
             swiftSettings: extraSettings,
-            plugins: [.plugin(name: "WireBuildPlugin", package: "swift-wire")]
+            plugins: [.plugin(name: "WireMVCBuildPlugin", package: "wire-mvc")]
         ),
         .testTarget(
             name: "SwiftHttpServerExampleTests",
