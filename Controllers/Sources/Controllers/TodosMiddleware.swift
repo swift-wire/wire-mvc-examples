@@ -35,21 +35,22 @@ public enum AuditKeys {
     public static let factory = FactoryKey()
 }
 
-/// A generic-with-deps middleware whose box-role parameters are declared in a **non-canonical order** —
+/// A generic-with-deps middleware over the box roles, declared in a **non-canonical order** —
 /// `<Sender, Reader, Ctx>` — with `@MiddlewareFactory(.responseSender, .reader, .requestContext)` mapping
-/// them positionally. It lives in the shared `Controllers` library, so its factory type is emitted by
-/// **library mode** (`WireContributorPlugin`) — which composes WireMVC's role vocabulary to order the
-/// synthesised `create`. So a reordered middleware works in a shared library, not just a graph consumer.
+/// them positionally, plus an **injected** `Repository`: it shares the controller's `TodoRepository`
+/// backend, resolved once and threaded to both through the same lifted generic (the injected axis).
 /// Behaviourally a dep-carrying observer: counts each request, forwards the box.
 @Factory(AuditKeys.factory)
 @MiddlewareFactory(.responseSender, .reader, .requestContext)
 public struct AuditGate<
     Sender: HTTPResponseSender & ~Copyable,
     Reader: AsyncReader & ~Copyable,
-    Ctx: HTTPServerCapability.RequestContext & ~Copyable
+    Ctx: HTTPServerCapability.RequestContext & ~Copyable,
+    Repository: TodoRepository
 >: Middleware
 where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields?, Sender.Writer: ~Copyable {
     @Inject var log: AuditLog
+    @Inject var repository: Repository
 
     public typealias Input = RequestResponseMiddlewareBox<Ctx, Reader, Sender>
     public typealias NextInput = Input
