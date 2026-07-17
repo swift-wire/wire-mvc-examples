@@ -14,8 +14,8 @@ public import WireMVC
 /// `RoutableHTTPServerBuilder` (the runtime's router).
 @Singleton
 @Controller("/todos")
-@Middleware(LogRequests<WireContext, WireReader, WireSender>.self)  // controller-scope: every route
-@Middleware(AuditKeys.factory)  // controller-scope, generic-with-deps, non-canonical parameter order
+@Middleware(ControllerMiddleware.logRequests)  // controller-scope: every route
+@Middleware(ControllerMiddleware.audit)  // controller-scope, generic-with-deps, non-canonical parameter order
 public struct TodosController<Repository: TodoRepository>: Sendable {
     @Inject var repository: Repository
 
@@ -56,7 +56,7 @@ public struct TodosController<Repository: TodoRepository>: Sendable {
 
     @Delete("/{id}")
     @ResponseStatus(.noContent)
-    @Middleware(RequireAPIKeyKeys.factory)  // route-scope gate — generic-with-deps, factory-lifted by key
+    @Middleware(RouteMiddleware.requireAPIKey)  // route-scope gate — generic-with-deps, factory-lifted by key
     public func delete(@Path id: String) async throws {
         try await repository.delete(id: id)
     }
