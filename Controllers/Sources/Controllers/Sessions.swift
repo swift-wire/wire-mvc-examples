@@ -41,8 +41,9 @@ public struct Session<Manager: SessionManager>: Sendable {
     /// so this scope entry borrows the singleton, ready to resolve the token to its stored session id.
     /// Throws `Unauthenticated` (mapped to 401 by the controller's `@ErrorResponse`) when the header is absent.
     @Inject public init(request: HTTPRequest, manager: Manager) throws {
-        let token = request.headerFields[HTTPField.Name("x-session")!] ?? ""
-        guard !token.isEmpty else { throw Unauthenticated() }
+        guard let token = request.headerFields[HTTPField.Name("x-session")!], !token.isEmpty else {
+            throw Unauthenticated()
+        }
         self.token = token
         self.user = "user:\(token)"
         self.manager = manager
