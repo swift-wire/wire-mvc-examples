@@ -35,7 +35,12 @@ struct ConfiguredHTTPClient {
     }
 
     @discardableResult
-    func put(_ path: String = "", bodyData: Data, collectUpTo: Int, json: Bool = false) async throws -> (
+    func put(
+        _ path: String = "",
+        bodyData: Data,
+        collectUpTo: Int,
+        json: Bool = false
+    ) async throws -> (
         HTTPResponse, Data
     ) {
         var client = client
