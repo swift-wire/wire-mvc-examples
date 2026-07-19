@@ -163,7 +163,11 @@ struct TodoVerificationTests {
             let noSession = try await client.execute(uri: "/me", method: .get)
             #expect(noSession.status == .unauthorized)
 
-            let alice = try await client.execute(uri: "/me", method: .get, headers: [HTTPField.Name("x-session")!: "alice"])
+            let alice = try await client.execute(
+                uri: "/me",
+                method: .get,
+                headers: [HTTPField.Name("x-session")!: "alice"]
+            )
             #expect(alice.status == .ok)
             #expect(try decode(Me.self, alice).user == "user:alice")
 
