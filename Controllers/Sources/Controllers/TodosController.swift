@@ -16,6 +16,7 @@ public import WireMVC
 @Controller("/todos")
 @Middleware(ControllerMiddleware.logRequests)  // controller-scope: every route
 @Middleware(ControllerMiddleware.audit)  // controller-scope, generic-with-deps, non-canonical parameter order
+@ErrorResponse(TodoNotFound.self, .notFound)  // handler throw (use-case-2) → 404, not the baseline 500
 public struct TodosController<Repository: TodoRepository>: Sendable {
     @Inject var repository: Repository
 

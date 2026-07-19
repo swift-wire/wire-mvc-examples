@@ -88,6 +88,11 @@ struct TodosRoutingTests {
             #expect(getStatus == 200)
             #expect(try JSONDecoder().decode(Todo.self, from: getData) == created)
 
+            // GET /todos/{missing} — the handler throws TodoNotFound; @ErrorResponse maps it to 404
+            // (M5.4E use-case-2, a handler throw), not the baseline 500.
+            let (missingStatus, _) = try await send("GET", "/todos/does-not-exist", port: port)
+            #expect(missingStatus == 404)
+
             // PATCH /todos/{id} (@Path + @JSONBody)
             let (patchStatus, patchData) = try await send(
                 "PATCH",
@@ -161,9 +166,10 @@ struct TodosRoutingTests {
             #expect(missStatus == 404)
 
             // @Scoped(seed: HTTPRequest.self) @Controller("/me") — a request-scoped controller alongside
-            // the @Singleton TodosController. The controller-scope RequireSession gate rejects a request
-            // with no x-session (401) before the scope is entered; with a session the controller is built
-            // fresh per request, injecting the request-scoped Session, so two requests see two identities.
+            // the @Singleton TodosController. The request-scoped Session throws Unauthenticated at scope
+            // construction when there is no x-session, and @ErrorResponse(Unauthenticated.self, .unauthorized)
+            // maps it to 401 (throw-at-scope-entry, no gate); with a session the controller is built fresh
+            // per request, injecting the request-scoped Session, so two requests see two identities.
             let (noSession, _) = try await send("GET", "/me", port: port)
             #expect(noSession == 401)
 

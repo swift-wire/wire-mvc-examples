@@ -96,6 +96,11 @@ struct TodoVerificationTests {
             #expect(got.status == .ok)
             #expect(try decode(Todo.self, got) == todo)
 
+            // get by @Path id, missing — the handler throws TodoNotFound; @ErrorResponse maps it to 404
+            // (M5.4E use-case-2, a handler throw), not the baseline 500.
+            let missing = try await execute(.GET, "/todos/does-not-exist")
+            #expect(missing.status == .notFound)
+
             // WireMVC: edit.
             let patched = try await execute(.PATCH, "/todos/\(todo.id)", json: true, body: #"{"completed":true}"#)
             #expect(patched.status == .ok)
@@ -140,10 +145,11 @@ struct TodoVerificationTests {
             #expect(model.bindings.contains { $0.type.contains("TodosController") })
 
             // @Scoped(seed: HTTPRequest.self) @Controller("/me") — a request-scoped controller alongside
-            // the @Singleton TodosController, here through the ServerTransport adapter. RequireSession
-            // rejects a request with no x-session (401) before the scope is entered; with a session the
-            // controller is built fresh per request from the request-scoped Session, so two requests see
-            // two identities.
+            // the @Singleton TodosController, here through the ServerTransport adapter. The request-scoped
+            // Session throws Unauthenticated at scope construction when there is no x-session, and
+            // @ErrorResponse(Unauthenticated.self, .unauthorized) maps it to 401 (throw-at-scope-entry, no
+            // gate); with a session the controller is built fresh per request from the request-scoped
+            // Session, so two requests see two identities.
             let noSession = try await execute(.GET, "/me")
             #expect(noSession.status == .unauthorized)
 
