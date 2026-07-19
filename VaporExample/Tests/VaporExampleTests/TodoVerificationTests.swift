@@ -149,11 +149,21 @@ struct TodoVerificationTests {
 
             let alice = try await execute(.GET, "/me", extraHeaders: ["x-session": "alice"])
             #expect(alice.status == .ok)
-            #expect(try decode(Me.self, alice).user == "user:alice")
+            let aliceMe = try decode(Me.self, alice)
+            #expect(aliceMe.user == "user:alice")
 
             let bob = try await execute(.GET, "/me", extraHeaders: ["x-session": "bob"])
             #expect(bob.status == .ok)
-            #expect(try decode(Me.self, bob).user == "user:bob")
+            let bobMe = try decode(Me.self, bob)
+            #expect(bobMe.user == "user:bob")
+
+            // The Session is fresh per request (distinct users). The @Singleton SessionManager it borrows is
+            // shared: it caches a UUID per token, so re-requesting with the same session returns the SAME id
+            // (a fresh-per-request manager would mint a new UUID each time), while a different token differs.
+            // This is the request-scope capture-dep, here through the adapter.
+            let aliceAgain = try await execute(.GET, "/me", extraHeaders: ["x-session": "alice"])
+            #expect(try decode(Me.self, aliceAgain).id == aliceMe.id)
+            #expect(aliceMe.id != bobMe.id)
         }
     }
 }
