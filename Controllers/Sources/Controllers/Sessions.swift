@@ -1,6 +1,34 @@
 import HTTPTypes
+public import Synchronization
 public import Wire
 public import WireMVC
+
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
+
+/// An app-`@Singleton` shared across every request — the other half of the request-scope story. A fresh
+/// `Session` is built per request, but there is one `SessionManager` for the whole app: the request-scoped
+/// `Session` *borrows* it (the M5.4 capture-dep). It mints a UUID session id for each token on first sight
+/// and **caches** it, so the same token resolves to the same id across requests — which is only possible
+/// because the same instance remembers it. A fresh-per-request manager would mint a new UUID every time.
+@Singleton
+public final class SessionManager: Sendable {
+    private let ids = Mutex<[String: String]>([:])
+
+    @Inject public init() {}
+
+    public func sessionID(for token: String) -> String {
+        ids.withLock { map in
+            if let existing = map[token] { return existing }
+            let created = UUID().uuidString
+            map[token] = created
+            return created
+        }
+    }
+}
 
 // The M5.4 request-scoped-controller case, portable across every runtime. A `@Scoped(seed:) @Controller`
 // is constructed fresh per request from the request seed (the bridge proxy's `_wireEnterScope` thunk),
@@ -20,14 +48,19 @@ public enum SessionMiddleware {
 @Scoped(seed: HTTPRequest.self)
 public struct Session: Sendable {
     public let user: String
-    @Inject public init(request: HTTPRequest) {
+    public let id: String
+    /// Injects the request seed (fresh per request) *and* the app-`@Singleton` `SessionManager` (shared) —
+    /// so this scope entry borrows the singleton, resolving the token to its cached session id.
+    @Inject public init(request: HTTPRequest, manager: SessionManager) {
         let token = request.headerFields[HTTPField.Name("x-session")!] ?? ""
         self.user = "user:\(token)"
+        self.id = manager.sessionID(for: token)
     }
 }
 
 public struct Me: Codable, Sendable, Equatable {
     public let user: String
+    public let id: String
 }
 
 /// A **request-scoped** controller — constructed fresh per request from the `HTTPRequest` seed,
@@ -43,7 +76,7 @@ public struct MeController: Sendable {
     @Get
     @JSONResponse
     public func me() async throws -> Me {
-        Me(user: session.user)
+        Me(user: session.user, id: session.id)
     }
 }
 

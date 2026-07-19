@@ -168,12 +168,21 @@ struct TodosRoutingTests {
             #expect(noSession == 401)
 
             let (aliceStatus, aliceData) = try await send("GET", "/me", port: port, headers: ["x-session": "alice"])
-            #expect(aliceStatus == 200)
-            #expect(try JSONDecoder().decode(Me.self, from: aliceData).user == "user:alice")
+            let alice = try JSONDecoder().decode(Me.self, from: aliceData)
+            #expect(aliceStatus == 200 && alice.user == "user:alice")
 
             let (bobStatus, bobData) = try await send("GET", "/me", port: port, headers: ["x-session": "bob"])
-            #expect(bobStatus == 200)
-            #expect(try JSONDecoder().decode(Me.self, from: bobData).user == "user:bob")
+            let bob = try JSONDecoder().decode(Me.self, from: bobData)
+            #expect(bobStatus == 200 && bob.user == "user:bob")
+
+            // The Session is fresh per request (distinct users). The @Singleton SessionManager it borrows is
+            // shared: it caches a UUID per token, so re-requesting with the same session returns the SAME id
+            // (a fresh-per-request manager would mint a new UUID each time), while a different token differs.
+            // This is the request-scope capture-dep — the scoped Session borrowing an app singleton.
+            let (_, aliceAgainData) = try await send("GET", "/me", port: port, headers: ["x-session": "alice"])
+            let aliceAgain = try JSONDecoder().decode(Me.self, from: aliceAgainData)
+            #expect(alice.id == aliceAgain.id)
+            #expect(alice.id != bob.id)
 
             group.cancelAll()
         }
