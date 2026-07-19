@@ -37,16 +37,16 @@ func provideValkeyClient() -> ValkeyClient {
 /// store itself is provisioned operationally (a real Valkey for `swift run`, a throwaway container the
 /// test starts). `@Singleton(as: TodoRepository.self)` binds it as the controller's repository.
 @Singleton(as: TodoRepository.self)
-public final class ValkeyTodoRepository: TodoRepository {
+struct ValkeyTodoRepository: TodoRepository {
     private let client: ValkeyClient
     private static let index = ValkeyKey("todos")  // list of ids, insertion order
     private static let sequence = ValkeyKey("todos:seq")  // INCR counter → todo ids
 
-    @Inject public init(client: ValkeyClient) {
+    @Inject init(client: ValkeyClient) {
         self.client = client
     }
 
-    public func all() async throws -> [Todo] {
+    func all() async throws -> [Todo] {
         var todos: [Todo] = []
         for token in try await client.lrange(Self.index, start: 0, stop: -1) {
             if let todo = try await find(id: try token.decode(as: String.self)) {
@@ -56,12 +56,12 @@ public final class ValkeyTodoRepository: TodoRepository {
         return todos
     }
 
-    public func find(id: String) async throws -> Todo? {
+    func find(id: String) async throws -> Todo? {
         guard let stored = try await client.get(Self.key(id)) else { return nil }
         return try JSONDecoder().decode(Todo.self, from: Data(stored))
     }
 
-    public func create(_ input: CreateTodo) async throws -> Todo {
+    func create(_ input: CreateTodo) async throws -> Todo {
         let id = try await client.incr(Self.sequence)
         let todo = Todo(id: String(id), title: input.title, completed: false)
         try await store(todo)
@@ -69,7 +69,7 @@ public final class ValkeyTodoRepository: TodoRepository {
         return todo
     }
 
-    public func update(id: String, with input: EditTodo) async throws -> Todo? {
+    func update(id: String, with input: EditTodo) async throws -> Todo? {
         guard var todo = try await find(id: id) else { return nil }
         if let title = input.title { todo.title = title }
         if let completed = input.completed { todo.completed = completed }
@@ -77,7 +77,7 @@ public final class ValkeyTodoRepository: TodoRepository {
         return todo
     }
 
-    public func delete(id: String) async throws {
+    func delete(id: String) async throws {
         _ = try await client.del(keys: [Self.key(id)])
         _ = try await client.lrem(Self.index, count: 0, element: id)
     }

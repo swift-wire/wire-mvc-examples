@@ -1,6 +1,5 @@
 import Configuration
 import Controllers
-import Logging
 import MongoKitten
 import Wire
 
@@ -10,49 +9,52 @@ import FoundationEssentials
 import Foundation
 #endif
 
-/// The Vapor runtime's backend — a real MongoDB, a document store (distinct from Hummingbird's
-/// embedded SQL and the proposal runtime's in-memory backend). Like any real app it reads its
-/// connection from the environment (via swift-configuration) and owns the `MongoDatabase` through
-/// Wire's DI: `@Inject init` connects; `@Teardown` disconnects the cluster at shutdown. It does *not*
-/// provision the database — that's operational (a real MongoDB for `swift run`, a throwaway container
-/// the test starts via swift-local-containers). Here it's just another `@Singleton(as:)`, and the
-/// `@Teardown` on that opaquely-bound singleton is exactly what wire-mvc-examples validates against
-/// swift-wire.
+/// The MongoDB connection, owned by the graph and shared by every backend that talks to it — the todo
+/// repository and the session store both inject the `MongoDatabase`, so the cluster is connected once (its
+/// endpoint read from the environment) and disconnected once. The producer-form `@Teardown` releases the
+/// cluster at shutdown; wire-mvc-examples validates that teardown runs against swift-wire. Each consumer
+/// works within its own collection (`todos`, `sessions`).
+@Provides
+@Teardown({ (database: MongoDatabase) in await (database.pool as? MongoCluster)?.disconnect() })
+func provideMongoDatabase() async throws -> MongoDatabase {
+    // Connection config from the environment, 12-factor style. swift-configuration maps each key to an env
+    // var (`mongo.host` → `MONGO_HOST`, `mongo.port` → `MONGO_PORT`). The test exports the container's
+    // host/port that way; a real deployment sets them however it manages config.
+    let config = ConfigReader(providers: [EnvironmentVariablesProvider()])
+    let host = config.string(forKey: "mongo.host", default: "localhost")
+    let port = config.int(forKey: "mongo.port", default: 27017)
+    return try await MongoDatabase.connect(to: "mongodb://\(host):\(port)/todos")
+}
+
+/// This runtime's todo backend — a real MongoDB, a document store (distinct from Hummingbird's Valkey and
+/// the proposal runtime's CouchDB). It talks to the store through the graph-owned `MongoDatabase` (shared
+/// with the session store), working within its `todos` collection. `@Singleton(as: TodoRepository.self)`
+/// binds it as the controller's repository.
 @Singleton(as: TodoRepository.self)
-public final class MongoDBTodoRepository: TodoRepository {
+struct MongoDBTodoRepository: TodoRepository {
     private let database: MongoDatabase
 
     private var todos: MongoCollection { database["todos"] }
 
-    @Inject public init() async throws {
-        // Connection config from the environment, 12-factor style. swift-configuration maps each key
-        // to an env var (`mongo.host` → `MONGO_HOST`, `mongo.port` → `MONGO_PORT`). The test exports
-        // the container's host/port that way; a real deployment sets them however it manages config.
-        let config = ConfigReader(providers: [EnvironmentVariablesProvider()])
-        let host = config.string(forKey: "mongo.host", default: "localhost")
-        let port = config.int(forKey: "mongo.port", default: 27017)
-        database = try await MongoDatabase.connect(to: "mongodb://\(host):\(port)/todos")
+    @Inject init(database: MongoDatabase) {
+        self.database = database
     }
 
-    @Teardown public func shutdown() async {
-        await (database.pool as? MongoCluster)?.disconnect()
-    }
-
-    public func all() async throws -> [Todo] {
+    func all() async throws -> [Todo] {
         try await todos.find().sort(["_id": 1]).decode(StoredTodo.self).drain().map(\.todo)
     }
 
-    public func find(id: String) async throws -> Todo? {
+    func find(id: String) async throws -> Todo? {
         try await todos.findOne(["_id": id], as: StoredTodo.self)?.todo
     }
 
-    public func create(_ input: CreateTodo) async throws -> Todo {
+    func create(_ input: CreateTodo) async throws -> Todo {
         let stored = StoredTodo(id: UUID().uuidString, title: input.title, completed: false)
         _ = try await todos.insertEncoded(stored)
         return stored.todo
     }
 
-    public func update(id: String, with input: EditTodo) async throws -> Todo? {
+    func update(id: String, with input: EditTodo) async throws -> Todo? {
         guard var todo = try await find(id: id) else { return nil }
         if let title = input.title { todo.title = title }
         if let completed = input.completed { todo.completed = completed }
@@ -60,7 +62,7 @@ public final class MongoDBTodoRepository: TodoRepository {
         return todo
     }
 
-    public func delete(id: String) async throws {
+    func delete(id: String) async throws {
         _ = try await todos.deleteOne(where: ["_id": id])
     }
 }

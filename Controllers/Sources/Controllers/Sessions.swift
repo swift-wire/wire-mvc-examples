@@ -1,33 +1,16 @@
 import HTTPTypes
-public import Synchronization
 public import Wire
 public import WireMVC
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
-
-/// An app-`@Singleton` shared across every request — the other half of the request-scope story. A fresh
-/// `Session` is built per request, but there is one `SessionManager` for the whole app: the request-scoped
-/// `Session` *borrows* it (the M5.4 capture-dep). It mints a UUID session id for each token on first sight
-/// and **caches** it, so the same token resolves to the same id across requests — which is only possible
-/// because the same instance remembers it. A fresh-per-request manager would mint a new UUID every time.
-@Singleton
-public final class SessionManager: Sendable {
-    private let ids = Mutex<[String: String]>([:])
-
-    @Inject public init() {}
-
-    public func sessionID(for token: String) -> String {
-        ids.withLock { map in
-            if let existing = map[token] { return existing }
-            let created = UUID().uuidString
-            map[token] = created
-            return created
-        }
-    }
+/// The app-`@Singleton` session store — one per app, shared across every request. Each runtime binds its
+/// own `@Singleton(as: SessionManager.self)` backend against its database (the same opaque-lift pattern as
+/// `TodoRepository`), so the token→session-id mapping lives in that runtime's real store. The request-scoped
+/// `Session` *borrows* it (the M5.4 capture-dep) and resolves the token to a **stable** id: the same token
+/// yields the same id across requests because the store persists it. Declared here (framework-free) but not
+/// satisfied here — each executable supplies the DB-backed implementation.
+public protocol SessionManager: Sendable {
+    /// The session id for `token`, minted and persisted on first sight, stable thereafter.
+    func sessionID(for token: String) async throws -> String
 }
 
 // The M5.4 request-scoped-controller case, portable across every runtime. A `@Scoped(seed:) @Controller`
@@ -42,19 +25,30 @@ public enum SessionMiddleware {
     public static let requireSession = FactoryKey()
 }
 
-/// A request-scoped identity — `@Scoped(seed: HTTPRequest.self)` makes it a per-request binding built
-/// from the request that opened the scope, so each request gets a fresh `Session`. The `RequireSession`
-/// gate guarantees a non-empty `x-session` header reached the terminal, so this init trusts it.
+/// A request-scoped identity — `@Scoped(seed: HTTPRequest.self)` makes it a per-request binding built from
+/// the request that opened the scope, so each request gets a fresh `Session`. Generic over the opaque
+/// `SessionManager` (an app `@Singleton(as:)`) because `some P` can't be a stored property — the same lift
+/// `MeController` uses for its repository. The `RequireSession` gate guarantees a non-empty `x-session`
+/// header reached the terminal, so this init trusts it.
 @Scoped(seed: HTTPRequest.self)
-public struct Session: Sendable {
+public struct Session<Manager: SessionManager>: Sendable {
     public let user: String
-    public let id: String
+    private let token: String
+    private let manager: Manager
     /// Injects the request seed (fresh per request) *and* the app-`@Singleton` `SessionManager` (shared) —
-    /// so this scope entry borrows the singleton, resolving the token to its cached session id.
-    @Inject public init(request: HTTPRequest, manager: SessionManager) {
+    /// so this scope entry borrows the singleton, ready to resolve the token to its stored session id.
+    @Inject public init(request: HTTPRequest, manager: Manager) {
         let token = request.headerFields[HTTPField.Name("x-session")!] ?? ""
+        self.token = token
         self.user = "user:\(token)"
-        self.id = manager.sessionID(for: token)
+        self.manager = manager
+    }
+
+    /// Resolve the stable session id from the store. The async DB read happens here, during request
+    /// handling — not in `init` (mirroring how the handler calls `repository.all()`) — so scope
+    /// construction stays synchronous.
+    public func id() async throws -> String {
+        try await manager.sessionID(for: token)
     }
 }
 
@@ -63,20 +57,28 @@ public struct Me: Codable, Sendable, Equatable {
     public let id: String
 }
 
-/// A **request-scoped** controller — constructed fresh per request from the `HTTPRequest` seed,
-/// injecting the request-scoped `Session`. Coexists with the app-`@Singleton` `TodosController`. The
-/// controller-scope `RequireSession` gate short-circuits an unauthenticated request with 401 before the
-/// terminal constructs the scope, so `Session`'s init only ever runs for an authenticated request.
+/// A **request-scoped** controller — constructed fresh per request from the `HTTPRequest` seed, injecting
+/// the request-scoped `Session`. Coexists with the app-`@Singleton` `TodosController`. Generic over **both**
+/// opaque app singletons it reaches: the `TodoRepository` backend and the `SessionManager` store (each an
+/// `@Singleton(as:)`), lifted as generic parameters. The controller-scope `RequireSession` gate
+/// short-circuits an unauthenticated request with 401 before the terminal constructs the scope, so
+/// `Session` only ever backs an authenticated request.
 @Scoped(seed: HTTPRequest.self)
 @Controller("/me")
 @Middleware(SessionMiddleware.requireSession)
-public struct MeController: Sendable {
-    @Inject var session: Session
+public struct MeController<Repository: TodoRepository, Manager: SessionManager>: Sendable {
+    @Inject var session: Session<Manager>  // request-scoped, generic over the opaque store
+    // The app's opaque-lifted backend (`@Singleton(as: TodoRepository.self)`, `some TodoRepository`),
+    // injected as a lifted generic parameter — the same portable shape `TodosController` uses. A
+    // request-scoped controller *borrowing* the shared app backend is the idiomatic M5.4 case.
+    @Inject var repository: Repository
 
     @Get
     @JSONResponse
     public func me() async throws -> Me {
-        Me(user: session.user, id: session.id)
+        // Prove the opaque backend resolves into (and is callable from) a request-scoped controller.
+        _ = try await repository.all()
+        return Me(user: session.user, id: try await session.id())
     }
 }
 
