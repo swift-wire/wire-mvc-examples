@@ -14,14 +14,14 @@ import Foundation
 /// back thereafter, so the same token resolves to the same id across requests. Injects the store's driver
 /// just like `ValkeyTodoRepository`, binding via the same opaque-lift pattern.
 @Singleton(as: SessionManager.self)
-public final class ValkeySessionManager: SessionManager {
+struct ValkeySessionManager: SessionManager {
     private let client: ValkeyClient
 
-    @Inject public init(client: ValkeyClient) {
+    @Inject init(client: ValkeyClient) {
         self.client = client
     }
 
-    public func sessionID(for token: String) async throws -> String {
+    func sessionID(for token: String) async throws -> String {
         let key = Self.key(token)
         if let stored = try await client.get(key) {
             return String(decoding: Data(stored), as: UTF8.self)

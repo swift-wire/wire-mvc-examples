@@ -1,8 +1,4 @@
-import AHCHTTPClient
-import AsyncHTTPClient
 import Controllers
-import HTTPAPIs
-import HTTPTypes
 import Wire
 
 #if canImport(FoundationEssentials)
@@ -11,56 +7,26 @@ import FoundationEssentials
 import Foundation
 #endif
 
-/// This runtime's backend — a real CouchDB, reached over HTTP with the *proposal's own* client. The
-/// proposal defines an `HTTPClient` protocol with pluggable backends; here we use the async-http-client
-/// backend (`AHCHTTPClient`) explicitly rather than `HTTP.get`/`DefaultHTTPClient.shared`, because the
-/// platform default is URLSession-backed on macOS and that backend currently hangs collecting keep-alive
-/// responses on the nightly toolchain — worth reporting upstream. Pinning the async-http-client backend
-/// keeps the same proposal call surface (`get`/`put`/`delete`) and works on both macOS and Linux.
-///
-/// CouchDB is a document store with a pure HTTP/JSON API (distinct from Hummingbird's embedded SQL and
-/// Vapor's MongoDB), so there's no specialised driver — just requests and `Codable`.
-/// `@Singleton(as: TodoRepository.self)` binds it; the database is provisioned by the test's container.
+/// This runtime's todo backend — a real CouchDB, a document store (distinct from Hummingbird's Valkey and
+/// Vapor's MongoDB). It reaches the store over the graph-owned `ConfiguredHTTPClient` (injected under the
+/// CouchDB key via `@Bind`, shared with the session store) rooted at its own `todos` database.
+/// `@Singleton(as: TodoRepository.self)` binds it as the controller's repository.
 @Singleton(as: TodoRepository.self)
-final class CouchDBTodoRepository: TodoRepository {
-    private let baseURL: String  // http://host:port/todos
-    private let authorization: String
+struct CouchDBTodoRepository: TodoRepository {
+    private let client: ConfiguredHTTPClient  // rooted at the todos database
     private static let maximumBody = 1_000_000
 
-    /// The process-wide async-http-client, reused across requests. It needs no explicit shutdown.
-    private var client: AsyncHTTPClient.HTTPClient { .shared }
-
-    @Inject init() async throws {
-        // Connection config from the environment, 12-factor style — the test exports the container's
-        // host/port that way; a real deployment sets them however it manages configuration.
-        let environment = ProcessInfo.processInfo.environment
-        let host = environment["COUCHDB_HOST"] ?? "localhost"
-        let port = environment["COUCHDB_PORT"] ?? "5984"
-        let user = environment["COUCHDB_USER"] ?? "admin"
-        let password = environment["COUCHDB_PASSWORD"] ?? "password"
-        baseURL = "http://\(host):\(port)/todos"
-        authorization = "Basic " + Data("\(user):\(password)".utf8).base64EncodedString()
-
+    @Inject init(@Bind(CouchDB.client) client: ConfiguredHTTPClient) async throws {
+        self.client = client.rooted(at: "todos")
         // Create the database (idempotent: 201 Created, or 412 Precondition Failed if it exists).
-        var client = client
-        let (response, _) = try await client.put(
-            url: URL(string: baseURL)!,
-            headerFields: headers(),
-            bodyData: Data(),
-            collectUpTo: Self.maximumBody
-        )
+        let (response, _) = try await self.client.put(bodyData: Data(), collectUpTo: Self.maximumBody)
         guard response.status == .created || response.status == .preconditionFailed else {
             throw CouchDBError(status: response.status)
         }
     }
 
     func all() async throws -> [Todo] {
-        var client = client
-        let (response, data) = try await client.get(
-            url: URL(string: "\(baseURL)/_all_docs?include_docs=true")!,
-            headerFields: headers(),
-            collectUpTo: Self.maximumBody
-        )
+        let (response, data) = try await client.get("_all_docs?include_docs=true", collectUpTo: Self.maximumBody)
         guard response.status == .ok else { throw CouchDBError(status: response.status) }
         return try JSONDecoder().decode(AllDocuments.self, from: data).rows.map(\.doc.todo)
     }
@@ -89,50 +55,27 @@ final class CouchDBTodoRepository: TodoRepository {
 
     func delete(id: String) async throws {
         guard let document = try await fetch(id: id) else { return }
-        var client = client
-        _ = try await client.delete(
-            url: URL(string: "\(baseURL)/\(id)?rev=\(document.rev)")!,
-            headerFields: headers(),
-            collectUpTo: Self.maximumBody
-        )
+        _ = try await client.delete("\(id)?rev=\(document.rev)", collectUpTo: Self.maximumBody)
     }
 
     // MARK: - Helpers
 
     /// Fetch the raw document (with its `_rev`, needed to update or delete).
     private func fetch(id: String) async throws -> StoredDocument? {
-        var client = client
-        let (response, data) = try await client.get(
-            url: URL(string: "\(baseURL)/\(id)")!,
-            headerFields: headers(),
-            collectUpTo: Self.maximumBody
-        )
+        let (response, data) = try await client.get(id, collectUpTo: Self.maximumBody)
         guard response.status == .ok else { return nil }
         return try JSONDecoder().decode(StoredDocument.self, from: data)
     }
 
     /// PUT a document (create when `body.rev` is nil, update otherwise).
     private func putDocument(id: String, body: DocumentBody) async throws {
-        var client = client
         let (response, _) = try await client.put(
-            url: URL(string: "\(baseURL)/\(id)")!,
-            headerFields: jsonHeaders(),
+            id,
             bodyData: try JSONEncoder().encode(body),
-            collectUpTo: Self.maximumBody
+            collectUpTo: Self.maximumBody,
+            json: true
         )
         guard response.status == .created else { throw CouchDBError(status: response.status) }
-    }
-
-    private func headers() -> HTTPFields {
-        var fields = HTTPFields()
-        fields[.authorization] = authorization
-        return fields
-    }
-
-    private func jsonHeaders() -> HTTPFields {
-        var fields = headers()
-        fields[.contentType] = "application/json"
-        return fields
     }
 }
 
@@ -181,8 +124,4 @@ private struct AllDocuments: Decodable {
     struct Row: Decodable {
         let doc: StoredDocument
     }
-}
-
-private struct CouchDBError: Error {
-    let status: HTTPResponse.Status
 }
