@@ -181,7 +181,11 @@ struct TodoVerificationTests {
             // shared: it caches a UUID per token, so re-requesting with the same session returns the SAME id
             // (a fresh-per-request manager would mint a new UUID each time), while a different token differs.
             // This is the request-scope capture-dep, here through the adapter.
-            let aliceAgain = try await client.execute(uri: "/me", method: .get, headers: [HTTPField.Name("x-session")!: "alice"])
+            let aliceAgain = try await client.execute(
+                uri: "/me",
+                method: .get,
+                headers: [HTTPField.Name("x-session")!: "alice"]
+            )
             #expect(try decode(Me.self, aliceAgain).id == aliceMe.id)
             #expect(aliceMe.id != bobMe.id)
         }
