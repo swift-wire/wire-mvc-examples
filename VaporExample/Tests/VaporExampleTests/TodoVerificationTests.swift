@@ -138,6 +138,22 @@ struct TodoVerificationTests {
             #expect(wiring.status == .ok)
             let model = try decode(WiringModel.self, wiring)
             #expect(model.bindings.contains { $0.type.contains("TodosController") })
+
+            // @Scoped(seed: HTTPRequest.self) @Controller("/me") — a request-scoped controller alongside
+            // the @Singleton TodosController, here through the ServerTransport adapter. RequireSession
+            // rejects a request with no x-session (401) before the scope is entered; with a session the
+            // controller is built fresh per request from the request-scoped Session, so two requests see
+            // two identities.
+            let noSession = try await execute(.GET, "/me")
+            #expect(noSession.status == .unauthorized)
+
+            let alice = try await execute(.GET, "/me", extraHeaders: ["x-session": "alice"])
+            #expect(alice.status == .ok)
+            #expect(try decode(Me.self, alice).user == "user:alice")
+
+            let bob = try await execute(.GET, "/me", extraHeaders: ["x-session": "bob"])
+            #expect(bob.status == .ok)
+            #expect(try decode(Me.self, bob).user == "user:bob")
         }
     }
 }
