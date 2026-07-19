@@ -12,8 +12,9 @@ public protocol TodoRepository: Sendable {
     func delete(id: String) async throws
 }
 
-/// Thrown when a todo isn't found. (Maps to 500 under M5's baseline error handling; typed
-/// error→response mapping — e.g. 404 — is deferred.)
+/// Thrown by a handler (`get`/`edit`) when a todo isn't found. `TodosController`'s
+/// `@ErrorResponse(TodoNotFound.self, .notFound)` maps this handler throw to 404 (M5.4E use-case-2) —
+/// without it, the baseline terminal re-throws it to the framework's 500.
 public struct TodoNotFound: Error {
     public init() {}
 }
