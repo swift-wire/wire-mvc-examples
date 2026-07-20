@@ -95,7 +95,9 @@ struct TodosRoutingTests {
             let exportText = String(decoding: exportData, as: UTF8.self)
             #expect(
                 exportStatus == 200 && exportText.contains("--wireboundary")
+                    && exportText.contains("Content-Type: application/json")
                     && exportText.contains("name=\"\(created.id)\"") && exportText.contains(created.title)
+                    && exportText.contains("completed")  // the whole Todo is JSON-encoded, not just the title
                     && exportText.contains("--wireboundary--")
             )
 

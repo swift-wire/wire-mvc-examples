@@ -97,7 +97,9 @@ struct TodoVerificationTests {
             let exportText = String(decoding: exported.body.readableBytesView, as: UTF8.self)
             #expect(
                 exported.status == .ok && exportText.contains("--wireboundary")
+                    && exportText.contains("Content-Type: application/json")
                     && exportText.contains("name=\"\(todo.id)\"") && exportText.contains(todo.title)
+                    && exportText.contains("completed")  // the whole Todo is JSON-encoded, not just the title
                     && exportText.contains("--wireboundary--")
             )
 

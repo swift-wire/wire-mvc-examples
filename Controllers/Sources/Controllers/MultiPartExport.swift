@@ -5,6 +5,12 @@ public import HTTPTypes
 public import Wire
 public import WireMVC
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
+
 // M5.4R — a real *streaming* multipart response. A sender-transforming middleware wraps the runtime's
 // response sender in a `MultiPartSender<S>`; the `@RawRoute(.responseSender)` handler receives that
 // transformed type (which constraint inference can't name) and streams one part per todo through a
@@ -24,11 +30,15 @@ where Wrapped.WriteElement == UInt8, Wrapped.FinalElement == HTTPFields? {
         self.boundary = boundary
     }
 
-    /// Frame and stream one part. Streaming: this issues a `write` per call, so a large collection is never
-    /// assembled in memory.
-    public mutating func writePart(name: String, _ body: String) async throws {
-        let framed = "--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"\r\n\r\n\(body)\r\n"
-        var buffer = UniqueArray<UInt8>(copying: Array(framed.utf8))
+    /// Frame and stream one part, JSON-encoding `value` as the part body (`Content-Type: application/json`).
+    /// Streaming: one `write` per call, so a large collection is never assembled in memory.
+    public mutating func writePart<Value: Encodable>(name: String, _ value: Value) async throws {
+        let header =
+            "--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"\r\nContent-Type: application/json\r\n\r\n"
+        var bytes = Array(header.utf8)
+        bytes.append(contentsOf: try JSONEncoder().encode(value))
+        bytes.append(contentsOf: Array("\r\n".utf8))
+        var buffer = UniqueArray<UInt8>(copying: bytes)
         try await wrapped.write(buffer: &buffer)
     }
 
@@ -126,7 +136,7 @@ public struct ExportController<Repository: TodoRepository>: Sendable {
         let todos = try await repository.all()
         var parts = try await responseSender.beginParts()
         for todo in todos {
-            try await parts.writePart(name: todo.id, todo.title)
+            try await parts.writePart(name: todo.id, todo)  // JSON-encode the whole todo as the part body
         }
         try await parts.finish()
     }
