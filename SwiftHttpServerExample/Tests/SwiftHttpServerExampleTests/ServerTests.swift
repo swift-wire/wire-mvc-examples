@@ -88,6 +88,17 @@ struct TodosRoutingTests {
             #expect(getStatus == 200)
             #expect(try JSONDecoder().decode(Todo.self, from: getData) == created)
 
+            // GET /export — @RawRoute(.responseSender) with a sender-transforming middleware (M5.4R): the
+            // handler receives a MultiPartSender<S> (a type constraint-inference can't name) and streams the
+            // todos as a multipart/mixed body, one part per todo, through a MultiPartWriter.
+            let (exportStatus, exportData) = try await send("GET", "/export", port: port)
+            let exportText = String(decoding: exportData, as: UTF8.self)
+            #expect(
+                exportStatus == 200 && exportText.contains("--wireboundary")
+                    && exportText.contains("name=\"\(created.id)\"") && exportText.contains(created.title)
+                    && exportText.contains("--wireboundary--")
+            )
+
             // GET /todos/{missing} — the handler throws TodoNotFound; @ErrorResponse maps it to 404
             // (M5.4E use-case-2, a handler throw), not the baseline 500.
             let (missingStatus, _) = try await send("GET", "/todos/does-not-exist", port: port)
