@@ -1,12 +1,15 @@
+import NIOHTTPServer  // server.serve(handler:)
+import WireMVCRouter  // builder.finalize()
+
 /// The serving entry point — the average app's `@main`: build the app via `buildApplication`, then
-/// `serve(on:)` (which freezes the trie into a compact router and serves it). Route verification
+/// `finalize()` the builder into the immutable `FrozenTrieRouter` and serve it. Route verification
 /// lives in the test target. In its own file with `@main` (not `main.swift`) so the test target can
 /// `@testable import SwiftHttpServerExample` to reach `buildApplication`.
 @main
 struct SwiftHttpServerExample {
     static func main() async throws {
-        let (server, router) = try await buildApplication(ServingArguments())
-        try await router.serve(on: server)
+        let (server, builder) = try await buildApplication(ServingArguments())
+        try await server.serve(handler: builder.finalize())
     }
 }
 

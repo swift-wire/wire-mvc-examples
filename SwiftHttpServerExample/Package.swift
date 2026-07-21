@@ -53,6 +53,9 @@ let package = Package(
             dependencies: [
                 .product(name: "Controllers", package: "Controllers"),
                 .product(name: "WireMVC", package: "wire-mvc"),
+                // The package-provided native router (TrieRouteBuilder / FrozenTrieRouter) — replaces
+                // this runtime's former in-tree TrieRouter copy.
+                .product(name: "WireMVCRouter", package: "wire-mvc"),
                 .product(name: "Wire", package: "swift-wire"),
                 .product(name: "NIOHTTPServer", package: "swift-http-server"),
                 .product(name: "HTTPAPIs", package: "swift-http-api-proposal"),
@@ -74,6 +77,7 @@ let package = Package(
             dependencies: [
                 "SwiftHttpServerExample",
                 .product(name: "Controllers", package: "Controllers"),
+                .product(name: "WireMVCRouter", package: "wire-mvc"),  // for router.finalize()
                 .product(name: "ContainerMacrosLib", package: "swift-local-containers"),
                 .product(name: "ContainerTestSupport", package: "swift-local-containers"),
                 .product(name: "DockerRuntime", package: "swift-local-containers"),
