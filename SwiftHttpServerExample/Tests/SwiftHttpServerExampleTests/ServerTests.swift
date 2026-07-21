@@ -6,6 +6,7 @@ import LocalContainers
 import NIOHTTPServer
 import Synchronization  // the LogRequests observe-middleware counter
 import Testing
+import WireMVCRouter  // for router.finalize()
 
 @testable import SwiftHttpServerExample
 
@@ -60,7 +61,7 @@ struct TodosRoutingTests {
         setenv("COUCHDB_PASSWORD", "password", 1)
 
         let (server, router) = try await buildApplication(TestArguments())
-        let handler = router.freeze()
+        let handler = router.finalize()
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask { try await server.serve(handler: handler) }
             let port = try #require(try await server.listeningAddresses.first?.port)
