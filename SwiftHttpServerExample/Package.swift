@@ -3,7 +3,7 @@ import PackageDescription
 
 // Runtime 3: the swift-http-api-proposal server, via swift-server's concrete `NIOHTTPServer`. Serves
 // the shared (framework-free) WireMVC controllers proposal-native: `@Controller`'s generated
-// witnesses register onto a `TrieRouteBuilder` (a concrete `RoutableHTTPServerBuilder` living in this
+// witnesses register onto a `TrieRouteBuilder` (a concrete `HTTPServerRouteBuilder` living in this
 // runtime), which freezes into the server's request handler. Structured like a real app — a
 // `buildApplication` assembly + a thin serving `@main`, with route verification in the test target.
 //

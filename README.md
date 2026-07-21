@@ -29,7 +29,7 @@ controller source — that's what makes it a genuine cross-runtime proof rather 
   `Controllers/` are byte-identical across every executable. Only the *assembly* differs: each app
   builds its runtime's router and registers the collated routes onto it — `WireMVCServerTransport.apply`
   onto a `some ServerTransport` for Hummingbird/Vapor, `WireMVC.apply` onto a `some
-  RoutableHTTPServerBuilder` (a trie router) for the proposal runtime. WireMVC stays
+  HTTPServerRouteBuilder` (a trie router) for the proposal runtime. WireMVC stays
   router/transport-agnostic.
 - **The full annotation surface, including raw streaming.** The shared controller exercises the typed
   surface — `@Path`/`@Query`/`@JSONBody`/`@Header`, `@JSONResponse`/`@ResponseStatus` — plus one
@@ -94,7 +94,7 @@ Linux (see CI).
   provisions a throwaway Mongo container and disconnects it on shutdown via the graph's `@Teardown`.
 - **SwiftHttpServerExample** (proposal) — current (Swift 6.4, real CouchDB via swift-local-containers).
   Serves the controllers directly over `swift-http-api-proposal`'s `HTTPServer` (swift-server's
-  `NIOHTTPServer`): `@Controller`'s generated witnesses register onto a trie `RoutableHTTPServerBuilder`,
+  `NIOHTTPServer`): `@Controller`'s generated witnesses register onto a trie `HTTPServerRouteBuilder`,
   which freezes into the server's request handler. Todos are stored in CouchDB — a document store with a
   pure HTTP/JSON API — reached with the *proposal's own* `HTTPClient` (the async-http-client backend), so
   this runtime exercises the proposal on both ends: serving on its server and calling out through its

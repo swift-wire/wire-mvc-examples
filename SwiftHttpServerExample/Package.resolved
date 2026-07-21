@@ -1,5 +1,5 @@
 {
-  "originHash" : "e4b24bae3f6219222b40f1ee37fd6fd866ba790140697309c8464a5e1ed19fe4",
+  "originHash" : "7291c968fab1a9ff45c6a321cbed4a55175e0f0aafc64b635d569e8ec26818cf",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -304,7 +304,7 @@
       "location" : "https://github.com/tachyonics/wire-mvc.git",
       "state" : {
         "branch" : "main",
-        "revision" : "dea074eed619c0d05ba3a369a3aa05a907523e76"
+        "revision" : "a2caec5b01683b4b221f065ef71c7b8bee3de90a"
       }
     },
     {
