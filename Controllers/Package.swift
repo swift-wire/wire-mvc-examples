@@ -4,7 +4,7 @@ import PackageDescription
 // The portable, framework-free WireMVC controllers, proposal-native. Shared by the proposal-based
 // runtime example(s) via a path dependency (`.package(path: "../Controllers")`). Depends only on
 // WireMVC + Wire — no HTTP framework — so the *same* controller source compiles into each runtime's
-// isolated package; `@Controller`'s generated witnesses register onto a `RoutableHTTPServerBuilder`.
+// isolated package; `@Controller`'s generated witnesses register onto a `HTTPServerRouteBuilder`.
 //
 // tools-version 6.4, deployment macOS 26, and the experimental/upcoming-feature flags match
 // proposal-native WireMVC — the generated witnesses interface with the proposal's `~Copyable` /

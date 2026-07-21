@@ -11,7 +11,7 @@ public import WireMVC
 /// backend the executable binds via `@Singleton(as: TodoRepository.self)`.
 ///
 /// `@Singleton @Controller` makes it a graph binding whose routes `WireMVC.apply` registers onto a
-/// `RoutableHTTPServerBuilder` (the runtime's router).
+/// `HTTPServerRouteBuilder` (the runtime's router).
 @Singleton
 @Controller("/todos")
 @Middleware(ControllerMiddleware.logRequests)  // controller-scope: every route

@@ -3,7 +3,7 @@ import HTTPAPIs
 import HTTPTypes
 import WireMVC
 
-// A concrete `RoutableHTTPServerBuilder` for this runtime — a path-segment trie. It shows that
+// A concrete `HTTPServerRouteBuilder` for this runtime — a path-segment trie. It shows that
 // WireMVC's registration contract carries a non-trivial router (vs. wire-mvc's linear `WireRouter`),
 // and that the build → freeze → serve lifecycle lives entirely in the runtime: WireMVC stays
 // router-agnostic, and `serve(on:)` is deliberately *not* a protocol requirement — it's a
@@ -15,14 +15,14 @@ struct ParameterEdge: Sendable {
     let child: Int
 }
 
-/// Build phase — a mutable `RoutableHTTPServerBuilder` that inserts each route into a trie keyed by
+/// Build phase — a mutable `HTTPServerRouteBuilder` that inserts each route into a trie keyed by
 /// path segment. Nodes live in a flat array (indices, not pointers). `freeze()` compacts it into an
 /// immutable `FrozenTrieRouter` for serving.
 struct TrieRouteBuilder<
     RequestContext: HTTPServerCapability.RequestContext & ~Copyable,
     Reader: AsyncReader & ~Copyable & SendableMetatype,
     ResponseSender: HTTPResponseSender & ~Copyable & SendableMetatype
->: RoutableHTTPServerBuilder
+>: HTTPServerRouteBuilder
 where
     Reader.ReadElement == UInt8,
     Reader.FinalElement == HTTPFields?,
