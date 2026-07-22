@@ -103,19 +103,21 @@ where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields?, Sender.Wr
         input: consuming Input,
         next: (consuming NextInput) async throws -> Return
     ) async throws -> Return {
-        switch consume input {
-        case .pending(let request, let requestContext, let reader, let responseSender):
-            return try await next(
-                .pending(
-                    request: request,
-                    requestContext: requestContext,
-                    reader: reader,
-                    responseSender: MultiPartSender(wrapping: responseSender)
+        try await input.withContents(
+            pending: { request, requestContext, reader, responseSender in
+                try await next(
+                    .pending(
+                        request: request,
+                        requestContext: requestContext,
+                        reader: reader,
+                        responseSender: MultiPartSender(wrapping: responseSender)
+                    )
                 )
-            )
-        case .responded(let request):
-            return try await next(.responded(request: request))
-        }
+            },
+            responded: { request in
+                try await next(.responded(request: request))
+            }
+        )
     }
 }
 
