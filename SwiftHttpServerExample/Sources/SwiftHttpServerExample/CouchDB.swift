@@ -1,6 +1,6 @@
 import AsyncHTTPClient
 import HTTPTypes
-import Wire
+package import Wire
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -11,8 +11,8 @@ import Foundation
 /// Keyed handle for the CouchDB client. `ConfiguredHTTPClient` is a reusable type (any service can have
 /// one), so a `BindingKey` names *this* app's CouchDB instance — the todo repository and the session store
 /// both `@Bind(CouchDB.client)` it and share one configured client, each rooting it at its own database.
-enum CouchDB {
-    static let client = BindingKey<ConfiguredHTTPClient>()
+package enum CouchDB {
+    package static let client = BindingKey<ConfiguredHTTPClient>()
 }
 
 /// Build the CouchDB client for the graph — a keyed `@Provides` returning a `ConfiguredHTTPClient` primed
@@ -21,7 +21,7 @@ enum CouchDB {
 /// currently hangs collecting keep-alive responses on the nightly toolchain, so pinning `.shared` keeps the
 /// same call surface working on macOS and Linux with no explicit shutdown.
 @Provides(CouchDB.client)
-func provideCouchDBClient() -> ConfiguredHTTPClient {
+package func provideCouchDBClient() -> ConfiguredHTTPClient {
     let environment = ProcessInfo.processInfo.environment
     let host = environment["COUCHDB_HOST"] ?? "localhost"
     let port = environment["COUCHDB_PORT"] ?? "5984"
@@ -35,6 +35,6 @@ func provideCouchDBClient() -> ConfiguredHTTPClient {
 }
 
 /// A non-success CouchDB response.
-struct CouchDBError: Error {
-    let status: HTTPResponse.Status
+package struct CouchDBError: Error {
+    package let status: HTTPResponse.Status
 }

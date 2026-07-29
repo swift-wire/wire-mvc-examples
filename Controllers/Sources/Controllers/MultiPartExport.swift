@@ -124,6 +124,7 @@ where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields?, Sender.Wr
 /// Streams the todos as a `multipart/mixed` response — one part per todo, written incrementally. Generic
 /// over the opaque-lifted `TodoRepository` (the same portable shape as `TodosController`); the route-scope
 /// `MultiPartExportMiddleware` transforms the sender, and the raw handler streams through it.
+@TestScopable  // app-scoped, but rebuilt per-request under a keyed suite so `/export` is mock-testable
 @Singleton
 @Controller("/export")
 public struct ExportController<Repository: TodoRepository>: Sendable {

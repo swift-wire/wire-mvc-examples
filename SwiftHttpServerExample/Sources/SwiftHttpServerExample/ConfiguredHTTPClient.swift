@@ -13,7 +13,7 @@ import Foundation
 /// sites pass only a relative path (defaulting to the base itself) and a body — no repeated headers. Wraps
 /// the process-wide async-http-client, so copies share one connection pool. `rooted(at:)` derives a client
 /// scoped to a sub-path; each CouchDB backend roots the shared client at its own database.
-struct ConfiguredHTTPClient {
+package struct ConfiguredHTTPClient {
     private let client: AsyncHTTPClient.HTTPClient
     private let baseURL: String
     private let authorization: String

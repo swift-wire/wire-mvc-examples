@@ -46,6 +46,10 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-log.git", from: "1.13.2"),
         .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.0.0"),
         .package(url: "https://github.com/tachyonics/swift-local-containers.git", from: "0.10.0"),
+        // smockable — generates a protocol mock from an `@Smock` protocol. The mocked routing suite mocks
+        // the `TodoRepository`/`SessionManager` protocols (via the external-protocol mirror workaround) and
+        // threads the generated mocks through the keyed WireMVCTesting harness.
+        .package(url: "https://github.com/tachyonics/smockable", branch: "main"),
     ],
     targets: [
         .executableTarget(
@@ -72,18 +76,60 @@ let package = Package(
             swiftSettings: extraSettings,
             plugins: [.plugin(name: "WireMVCBuildPlugin", package: "wire-mvc")]
         ),
+        // Real-backend integration suite. Re-composes the app's production graph (the plugin re-parses the
+        // app via its `_WireExports.swift` marker) — the real `CouchDB*` bindings, served through the keyless
+        // `@Suite(.wiremvc())` harness on an ephemeral port (its `@Replaces` supersedes `ServerConfig`'s 8080).
+        // A container trait provisions a throwaway CouchDB; a small env trait threads its host/port into the
+        // graph's `provideCouchDBClient` before the harness bootstraps. Depending on `WireMVCTesting` makes the
+        // plugin emit the `.wiremvc()` suite-trait factory (not a `@main`, which can't live in a test bundle).
         .testTarget(
             name: "SwiftHttpServerExampleTests",
             dependencies: [
                 "SwiftHttpServerExample",
+                // Direct deps so the plugin re-parses WireMVC's adapter directives when re-composing the
+                // app's graph, and so the generated `.wiremvc()` factory's references resolve.
+                .product(name: "WireMVC", package: "wire-mvc"),
+                .product(name: "WireMVCRouter", package: "wire-mvc"),
+                .product(name: "WireMVCTesting", package: "wire-mvc"),
                 .product(name: "Controllers", package: "Controllers"),
-                .product(name: "WireMVCRouter", package: "wire-mvc"),  // for router.finalize()
+                .product(name: "Wire", package: "swift-wire"),
+                .product(name: "HTTPAPIs", package: "swift-http-api-proposal"),
+                .product(name: "HTTPTypes", package: "swift-http-types"),
+                .product(name: "NIOHTTPServer", package: "swift-http-server"),
+                .product(name: "Logging", package: "swift-log"),
+                .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
                 .product(name: "ContainerMacrosLib", package: "swift-local-containers"),
                 .product(name: "ContainerTestSupport", package: "swift-local-containers"),
                 .product(name: "DockerRuntime", package: "swift-local-containers"),
                 .product(name: "LocalContainers", package: "swift-local-containers"),
             ],
-            swiftSettings: extraSettings
+            swiftSettings: extraSettings,
+            plugins: [.plugin(name: "WireMVCBuildPlugin", package: "wire-mvc")]
+        ),
+        // Mocked routing suite — smockable mocks for `TodoRepository` + `SessionManager` threaded into the
+        // request-scoped `MeController<Repository, Manager>` (generic over both mocked slots — the
+        // opaque-injection lift) via a keyed `@BindType` harness (`@Suite(.wiremvc(key))` + `withBindValues` +
+        // `verify`). The keyed suite serves the key's variant app graph, which drops the app's
+        // `@Singleton(as:)` CouchDB bindings, so the real backend's `init` never runs — the suite is
+        // Docker-free without touching the production graph.
+        .testTarget(
+            name: "SwiftHttpServerExampleMockedTests",
+            dependencies: [
+                "SwiftHttpServerExample",
+                .product(name: "WireMVC", package: "wire-mvc"),
+                .product(name: "WireMVCRouter", package: "wire-mvc"),
+                .product(name: "WireMVCTesting", package: "wire-mvc"),
+                .product(name: "Controllers", package: "Controllers"),
+                .product(name: "Wire", package: "swift-wire"),
+                .product(name: "HTTPAPIs", package: "swift-http-api-proposal"),
+                .product(name: "HTTPTypes", package: "swift-http-types"),
+                .product(name: "NIOHTTPServer", package: "swift-http-server"),
+                .product(name: "Logging", package: "swift-log"),
+                .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
+                .product(name: "Smockable", package: "smockable"),
+            ],
+            swiftSettings: extraSettings,
+            plugins: [.plugin(name: "WireMVCBuildPlugin", package: "wire-mvc")]
         ),
     ]
 )
