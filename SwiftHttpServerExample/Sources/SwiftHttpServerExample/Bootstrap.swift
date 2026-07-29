@@ -1,0 +1,75 @@
+package import HTTPAPIs
+import HTTPTypes
+import Logging
+package import NIOHTTPServer
+package import Wire
+package import WireMVC
+import WireMVCRouter
+
+// The WireMVC-native composition root. `@Singleton` makes it a graph binding (its `@Inject` resolves);
+// `@WireMVCBootstrap` makes the plugin generate the program entry point (`@main`) for a program consumer,
+// or the companion `.wiremvc()` suite-trait factory for a test consumer. There is no `main.swift` and no
+// hand-written `@main` — `swift run SwiftHttpServerExample` bootstraps the graph, constructs this type,
+// registers the collated controllers onto the package `TrieRouteBuilder`, and serves on 127.0.0.1.
+//
+// `package` (with `package import Wire`) so a same-package test target can re-parse and re-compose these
+// bindings — the real-backend suite serves this exact graph, the mocked suite supersedes the CouchDB
+// backends with in-memory fakes and threads per-request smockable doubles through the keyed harness.
+
+@Singleton
+@WireMVCBootstrap
+package struct AppBootstrap {
+    @Inject let config: ServerConfig
+
+    // Returns the *concrete* server, not `some HTTPServer`: the proposal's `Reader`/`ResponseSender`
+    // are `~Copyable`, which a bare `some HTTPServer` opaque return can't express. The generated
+    // `@main` (and `.wiremvc()` suite trait) binds to whatever concrete type this returns.
+    package func createServer() throws -> NIOHTTPServer {
+        NIOHTTPServer(
+            logger: Logger(label: "SwiftHttpServerExample"),
+            configuration: try .init(
+                bindTarget: .hostAndPort(host: config.host, port: config.port),
+                supportedHTTPVersions: [.http1_1],
+                transportSecurity: .plaintext
+            )
+        )
+    }
+
+    // The package-provided `TrieRouteBuilder` is a `FinalizableHTTPServerRouteBuilder`: `WireMVC.apply`
+    // registers routes onto it, and the generated entry point `finalize()`s it into the immutable
+    // `FrozenTrieRouter` the server serves (build → freeze → serve).
+    package func createRouteBuilder<Server: HTTPServer>(
+        for server: borrowing Server
+    ) -> some FinalizableHTTPServerRouteBuilder<Server.RequestContext, Server.Reader, Server.ResponseSender>
+    where
+        Server.RequestContext: ~Copyable,
+        Server.Reader: ~Copyable,
+        Server.ResponseSender: ~Copyable,
+        Server.ResponseSender.Writer: ~Copyable
+    {
+        TrieRouteBuilder(for: server)
+    }
+
+    // Mount the graph's wiring model (`introspect()` as JSON) at `/wiring` — unguarded (no `@Middleware`),
+    // so the generated entry point registers it via `WireMVC.mountIntrospection` before `finalize()`.
+    // Returning `nil` would skip it.
+    package func mountIntrospectionAt() -> String? { "/wiring" }
+}
+
+/// The server bind config the composition root injects. `package` so a test target re-composing the app can
+/// supersede the production port with an OS-ephemeral `0` — see `serverConfig()`.
+package struct ServerConfig: Sendable {
+    package let host: String
+    package let port: Int
+    package init(host: String, port: Int) {
+        self.host = host
+        self.port = port
+    }
+}
+
+/// The production binding for `ServerConfig` — a `@Provides` factory binding the fixed production port
+/// `8080`. Its provider form lets a test target's `@Provides @Replaces` supersede it provider-for-provider,
+/// swapping in an ephemeral port so parallel test servers don't collide.
+@Provides package func serverConfig() -> ServerConfig {
+    ServerConfig(host: "127.0.0.1", port: 8080)
+}

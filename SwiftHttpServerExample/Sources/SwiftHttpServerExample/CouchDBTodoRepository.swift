@@ -1,5 +1,5 @@
-import Controllers
-import Wire
+package import Controllers
+package import Wire
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -12,11 +12,11 @@ import Foundation
 /// CouchDB key via `@Bind`, shared with the session store) rooted at its own `todos` database.
 /// `@Singleton(as: TodoRepository.self)` binds it as the controller's repository.
 @Singleton(as: TodoRepository.self)
-struct CouchDBTodoRepository: TodoRepository {
+package struct CouchDBTodoRepository: TodoRepository {
     private let client: ConfiguredHTTPClient  // rooted at the todos database
     private static let maximumBody = 1_000_000
 
-    @Inject init(@Bind(CouchDB.client) client: ConfiguredHTTPClient) async throws {
+    @Inject package init(@Bind(CouchDB.client) client: ConfiguredHTTPClient) async throws {
         self.client = client.rooted(at: "todos")
         // Create the database (idempotent: 201 Created, or 412 Precondition Failed if it exists).
         let (response, _) = try await self.client.put(bodyData: Data(), collectUpTo: Self.maximumBody)
@@ -25,23 +25,23 @@ struct CouchDBTodoRepository: TodoRepository {
         }
     }
 
-    func all() async throws -> [Todo] {
+    package func all() async throws -> [Todo] {
         let (response, data) = try await client.get("_all_docs?include_docs=true", collectUpTo: Self.maximumBody)
         guard response.status == .ok else { throw CouchDBError(status: response.status) }
         return try JSONDecoder().decode(AllDocuments.self, from: data).rows.map(\.doc.todo)
     }
 
-    func find(id: String) async throws -> Todo? {
+    package func find(id: String) async throws -> Todo? {
         try await fetch(id: id)?.todo
     }
 
-    func create(_ input: CreateTodo) async throws -> Todo {
+    package func create(_ input: CreateTodo) async throws -> Todo {
         let todo = Todo(id: UUID().uuidString, title: input.title, completed: false)
         try await putDocument(id: todo.id, body: DocumentBody(rev: nil, title: todo.title, completed: todo.completed))
         return todo
     }
 
-    func update(id: String, with input: EditTodo) async throws -> Todo? {
+    package func update(id: String, with input: EditTodo) async throws -> Todo? {
         guard let document = try await fetch(id: id) else { return nil }
         var todo = document.todo
         if let title = input.title { todo.title = title }
@@ -53,7 +53,7 @@ struct CouchDBTodoRepository: TodoRepository {
         return todo
     }
 
-    func delete(id: String) async throws {
+    package func delete(id: String) async throws {
         guard let document = try await fetch(id: id) else { return }
         _ = try await client.delete("\(id)?rev=\(document.rev)", collectUpTo: Self.maximumBody)
     }

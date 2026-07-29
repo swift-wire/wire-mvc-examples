@@ -1,5 +1,5 @@
-import Controllers
-import Wire
+package import Controllers
+package import Wire
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -13,11 +13,11 @@ import Foundation
 /// id is minted once (on first sight) and read back thereafter, so the same token resolves to the same id
 /// across requests.
 @Singleton(as: SessionManager.self)
-struct CouchDBSessionManager: SessionManager {
+package struct CouchDBSessionManager: SessionManager {
     private let client: ConfiguredHTTPClient  // rooted at the sessions database
     private static let maximumBody = 1_000_000
 
-    @Inject init(@Bind(CouchDB.client) client: ConfiguredHTTPClient) async throws {
+    @Inject package init(@Bind(CouchDB.client) client: ConfiguredHTTPClient) async throws {
         self.client = client.rooted(at: "sessions")
         // Create the database (idempotent: 201 Created, or 412 Precondition Failed if it exists).
         let (response, _) = try await self.client.put(bodyData: Data(), collectUpTo: Self.maximumBody)
@@ -26,7 +26,7 @@ struct CouchDBSessionManager: SessionManager {
         }
     }
 
-    func sessionID(for token: String) async throws -> String {
+    package func sessionID(for token: String) async throws -> String {
         if let existing = try await storedID(for: token) { return existing }
         let created = UUID().uuidString
         if try await create(token: token, sessionID: created) { return created }

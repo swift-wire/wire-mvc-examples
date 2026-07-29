@@ -12,6 +12,7 @@ public import WireMVC
 ///
 /// `@Singleton @Controller` makes it a graph binding whose routes `WireMVC.apply` registers onto a
 /// `HTTPServerRouteBuilder` (the runtime's router).
+@TestScopable  // app-scoped, but rebuilt per-request under a keyed suite so `/todos` is mock-testable
 @Singleton
 @Controller("/todos")
 @Middleware(ControllerMiddleware.logRequests)  // controller-scope: every route
