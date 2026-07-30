@@ -28,7 +28,10 @@ let package = Package(
     platforms: [.macOS(.v26)],
     dependencies: [
         .package(path: "../Controllers"),
-        .package(url: "https://github.com/tachyonics/wire-mvc.git", branch: "main"),
+        // `NIOHTTPServer` switches on WireMVCTesting's `NIOHTTPServer: WireMVCTestServer` conformance and
+        // the `.swiftHttpServer` suite mode. Off by default in wire-mvc, so a consumer that doesn't serve on
+        // NIO resolves no server package at all — this runtime does, so it opts in.
+        .package(url: "https://github.com/tachyonics/wire-mvc.git", branch: "main", traits: ["NIOHTTPServer"]),
         .package(url: "https://github.com/tachyonics/swift-wire.git", branch: "main"),
         .package(url: "https://github.com/swift-server/swift-http-server.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-http-api-proposal.git", .upToNextMinor(from: "0.2.0")),
@@ -78,16 +81,16 @@ let package = Package(
         ),
         // Real-backend integration suite. Re-composes the app's production graph (the plugin re-parses the
         // app via its `_WireExports.swift` marker) — the real `CouchDB*` bindings, served through the keyless
-        // `@Suite(.wiremvc())` harness on an ephemeral port (its `@Replaces` supersedes `ServerConfig`'s 8080).
+        // `@Suite(.wiremvc(.swiftHttpServer))` harness on a harness-owned server bound to an ephemeral port.
         // A container trait provisions a throwaway CouchDB; a small env trait threads its host/port into the
         // graph's `provideCouchDBClient` before the harness bootstraps. Depending on `WireMVCTesting` makes the
-        // plugin emit the `.wiremvc()` suite-trait factory (not a `@main`, which can't live in a test bundle).
+        // plugin emit the `.wiremvc(_:)` suite-trait factory (not a `@main`, which can't live in a test bundle).
         .testTarget(
             name: "SwiftHttpServerExampleTests",
             dependencies: [
                 "SwiftHttpServerExample",
                 // Direct deps so the plugin re-parses WireMVC's adapter directives when re-composing the
-                // app's graph, and so the generated `.wiremvc()` factory's references resolve.
+                // app's graph, and so the generated `.wiremvc(_:)` factory's references resolve.
                 .product(name: "WireMVC", package: "wire-mvc"),
                 .product(name: "WireMVCRouter", package: "wire-mvc"),
                 .product(name: "WireMVCTesting", package: "wire-mvc"),
@@ -106,9 +109,10 @@ let package = Package(
             swiftSettings: extraSettings,
             plugins: [.plugin(name: "WireMVCBuildPlugin", package: "wire-mvc")]
         ),
-        // Mocked routing suite — smockable mocks for `TodoRepository` + `SessionManager` threaded into the
+        // Mocked routing suite — socket-free (`.inProcess`), so it depends on no concrete server at all.
+        // It tests route/controller logic, not transport. smockable mocks for `TodoRepository` + `SessionManager` threaded into the
         // request-scoped `MeController<Repository, Manager>` (generic over both mocked slots — the
-        // opaque-injection lift) via a keyed `@BindType` harness (`@Suite(.wiremvc(key))` + `withBindValues` +
+        // opaque-injection lift) via a keyed `@BindType` harness (`@Suite(.wiremvc(key, .inProcess))` + `withBindValues` +
         // `verify`). The keyed suite serves the key's variant app graph, which drops the app's
         // `@Singleton(as:)` CouchDB bindings, so the real backend's `init` never runs — the suite is
         // Docker-free without touching the production graph.
@@ -123,7 +127,6 @@ let package = Package(
                 .product(name: "Wire", package: "swift-wire"),
                 .product(name: "HTTPAPIs", package: "swift-http-api-proposal"),
                 .product(name: "HTTPTypes", package: "swift-http-types"),
-                .product(name: "NIOHTTPServer", package: "swift-http-server"),
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
                 .product(name: "Smockable", package: "smockable"),
