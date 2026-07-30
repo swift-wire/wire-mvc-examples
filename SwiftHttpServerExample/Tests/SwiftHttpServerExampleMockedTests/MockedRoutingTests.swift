@@ -3,8 +3,10 @@ import Smockable
 import Testing
 import WireMVCTesting
 
-// The mocked routing suite — routing/controller logic in isolation, no CouchDB. `@Suite(.wiremvc(key, .inProcess))` stands
-// the app up on an ephemeral loopback port with the keyed harness parked for `MockedRoutingBinds.mocks`; each
+// The mocked routing suite — routing/controller logic in isolation, no CouchDB and no transport.
+// `@Suite(.wiremvc(key, .inProcess))` builds the app's real router over an in-memory server and calls the
+// finalized handler directly: no socket, no port, and the app's `createServer()` is never involved. The keyed
+// harness is parked for `MockedRoutingBinds.mocks`; each
 // test supplies its per-request smockable doubles with the generated `withBindValues(todoRepository:…,
 // sessionManager:…)`. `/me` is the app's only seed-scoped (`@Scoped(seed:)`) controller, so it's the keyed
 // harness's one variant subject — and it happens to exercise both mocked slots: its handler calls

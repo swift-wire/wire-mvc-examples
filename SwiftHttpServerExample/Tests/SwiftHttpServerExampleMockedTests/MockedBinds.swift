@@ -16,10 +16,3 @@ enum MockedRoutingBinds {
     @BindType(SessionManager.self, SessionManagerMock.self)
     static let mocks = TestingKey()
 }
-
-/// Supersede the app's production `ServerConfig` (port 8080) with an OS-ephemeral port — the harness reads the
-/// bound port back.
-@Provides @Replaces
-func testServerConfig() -> ServerConfig {
-    ServerConfig(host: "127.0.0.1", port: 0)
-}

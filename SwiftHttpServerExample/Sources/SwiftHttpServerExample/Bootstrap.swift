@@ -68,8 +68,8 @@ package struct ServerConfig: Sendable {
 }
 
 /// The production binding for `ServerConfig` — a `@Provides` factory binding the fixed production port
-/// `8080`. Its provider form lets a test target's `@Provides @Replaces` supersede it provider-for-provider,
-/// swapping in an ephemeral port so parallel test servers don't collide.
+/// `8080`. Only the app's own `createServer()` reads it: a suite serves on the server its
+/// `WireMVCTestMode` carries, so no test target has to `@Replaces` this.
 @Provides package func serverConfig() -> ServerConfig {
     ServerConfig(host: "127.0.0.1", port: 8080)
 }
