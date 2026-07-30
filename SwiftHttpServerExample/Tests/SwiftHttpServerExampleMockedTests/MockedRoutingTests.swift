@@ -3,7 +3,7 @@ import Smockable
 import Testing
 import WireMVCTesting
 
-// The mocked routing suite — routing/controller logic in isolation, no CouchDB. `@Suite(.wiremvc(key))` stands
+// The mocked routing suite — routing/controller logic in isolation, no CouchDB. `@Suite(.wiremvc(key, .inProcess))` stands
 // the app up on an ephemeral loopback port with the keyed harness parked for `MockedRoutingBinds.mocks`; each
 // test supplies its per-request smockable doubles with the generated `withBindValues(todoRepository:…,
 // sessionManager:…)`. `/me` is the app's only seed-scoped (`@Scoped(seed:)`) controller, so it's the keyed
@@ -11,7 +11,7 @@ import WireMVCTesting
 // `repository.all()` (the todo op) and `session.id()` → `manager.sessionID(for:)` (the session op). Verifying
 // those interactions proves the request routed through the controller against the mocks, with no backend.
 
-@Suite(.wiremvc(MockedRoutingBinds.mocks))
+@Suite(.wiremvc(MockedRoutingBinds.mocks, .inProcess))
 struct MockedRoutingTests {
     /// `GET /me` with an `x-session` header: the request-scoped `MeController` is built fresh, injecting the
     /// mocked `TodoRepository` directly and the mocked `SessionManager` through its `Session`. The response

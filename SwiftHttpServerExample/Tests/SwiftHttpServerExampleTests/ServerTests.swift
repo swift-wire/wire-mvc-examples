@@ -28,9 +28,9 @@ struct TodoContainers {
 }
 
 /// Bridges the container-assigned CouchDB endpoint into the graph's environment-read `provideCouchDBClient`
-/// *before* the `.wiremvc()` harness bootstraps. Ordered after `containerTrait` (so the container is up and
-/// `ContainerTestContext.current` is set) and before `.wiremvc()` (so `Wire.bootstrap()` reads these) in the
-/// `@Suite` trait list — the first-listed trait scopes outermost, so `containerTrait ▸ this ▸ .wiremvc()`.
+/// *before* the `.wiremvc(_:)` harness bootstraps. Ordered after `containerTrait` (so the container is up and
+/// `ContainerTestContext.current` is set) and before `.wiremvc(_:)` (so `Wire.bootstrap()` reads these) in the
+/// `@Suite` trait list — the first-listed trait scopes outermost, so `containerTrait ▸ this ▸ .wiremvc(_:)`.
 struct CouchDBEnvTrait: SuiteTrait, TestScoping {
     let isRecursive = false
 
@@ -53,7 +53,9 @@ struct CouchDBEnvTrait: SuiteTrait, TestScoping {
 }
 
 /// The real-backend integration suite: serves the app's **production graph** (the real `CouchDB*` bindings)
-/// through the keyless `@Suite(.wiremvc())` harness on an ephemeral loopback port, driving the full todos
+/// through the keyless `@Suite(.wiremvc(.swiftHttpServer))` harness — a `NIOHTTPServer` the harness owns and
+/// binds to an ephemeral loopback port, so nothing has to `@Replaces` the app's `ServerConfig` down to 0 —
+/// driving the full todos
 /// CRUD lifecycle plus `/wiring` and the request-scoped `/me` over real HTTP against the container-backed
 /// CouchDB — the same seam the mocked suite uses, but end to end. Serialized: the tests mutate one shared
 /// CouchDB, so they must not interleave.
@@ -61,7 +63,7 @@ struct CouchDBEnvTrait: SuiteTrait, TestScoping {
     "SwiftHttpServerExample real backend",
     TodoContainers.containerTrait,
     CouchDBEnvTrait(),
-    .wiremvc(),
+    .wiremvc(.swiftHttpServer),
     .enabled(if: containerRuntimeAvailable, "A container runtime (Docker) is required"),
     .serialized
 )

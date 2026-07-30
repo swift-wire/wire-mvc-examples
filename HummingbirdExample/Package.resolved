@@ -155,15 +155,6 @@
       }
     },
     {
-      "identity" : "swift-http-server",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/swift-server/swift-http-server.git",
-      "state" : {
-        "branch" : "main",
-        "revision" : "c2e1f5a4dfe1ce73fa7f6d6ab047081cdc2617c3"
-      }
-    },
-    {
       "identity" : "swift-http-structured-headers",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-http-structured-headers.git",
@@ -349,7 +340,7 @@
       "location" : "https://github.com/tachyonics/wire-mvc.git",
       "state" : {
         "branch" : "main",
-        "revision" : "af197ca4842ec4e43484717e154f7d2ec211d294"
+        "revision" : "544b40839fad7649361c6961c5ab7f2e5d959860"
       }
     },
     {
