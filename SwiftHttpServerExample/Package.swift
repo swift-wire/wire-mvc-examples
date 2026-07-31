@@ -112,7 +112,7 @@ let package = Package(
         // Mocked routing suite — socket-free (`.inProcess`), so it depends on no concrete server at all.
         // It tests route/controller logic, not transport. smockable mocks for `TodoRepository` + `SessionManager` threaded into the
         // request-scoped `MeController<Repository, Manager>` (generic over both mocked slots — the
-        // opaque-injection lift) via a keyed `@BindType` harness (`@Suite(.wiremvc(key, .inProcess))` + `withBindValues` +
+        // opaque-injection lift) via a keyed `@BindType` harness (`@Suite(.wiremvc(key, .inProcess))` + `withClient(supplying:)` +
         // `verify`). The keyed suite serves the key's variant app graph, which drops the app's
         // `@Singleton(as:)` CouchDB bindings, so the real backend's `init` never runs — the suite is
         // Docker-free without touching the production graph.
