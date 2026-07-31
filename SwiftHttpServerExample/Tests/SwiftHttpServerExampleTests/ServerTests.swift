@@ -75,102 +75,102 @@ struct TodosRoutingTests {
         // and a typed method would fold them into its return-or-throw.
         try await withClient { client in
 
-                // POST /todos (@JSONBody, @JSONResponse(status: .created))
-                let create = try await client.post("/todos", json: ["title": "Buy milk"])
-                #expect(create.status == 201)
-                let created = try create.json(Todo.self)
-                #expect(created.title == "Buy milk" && created.completed == false)
+            // POST /todos (@JSONBody, @JSONResponse(status: .created))
+            let create = try await client.post("/todos", json: ["title": "Buy milk"])
+            #expect(create.status == 201)
+            let created = try create.json(Todo.self)
+            #expect(created.title == "Buy milk" && created.completed == false)
 
-                // GET /todos (@JSONResponse list)
-                let list = try await client.get("/todos")
-                #expect(list.status == 200)
-                let todos = try list.json([Todo].self)
-                #expect(todos.count == 1 && todos.first?.id == created.id)
+            // GET /todos (@JSONResponse list)
+            let list = try await client.get("/todos")
+            #expect(list.status == 200)
+            let todos = try list.json([Todo].self)
+            #expect(todos.count == 1 && todos.first?.id == created.id)
 
-                // GET /todos/{id} (@Path)
-                let fetched = try await client.get("/todos/\(created.id)")
-                #expect(fetched.status == 200)
-                #expect(try fetched.json(Todo.self) == created)
+            // GET /todos/{id} (@Path)
+            let fetched = try await client.get("/todos/\(created.id)")
+            #expect(fetched.status == 200)
+            #expect(try fetched.json(Todo.self) == created)
 
-                // GET /export — @RawRoute(.responseSender) with a sender-transforming middleware: streams the todos
-                // as a multipart/mixed body, one part per todo.
-                let export = try await client.get("/export")
-                #expect(export.status == 200)
-                let exportText = export.bodyText
-                #expect(
-                    exportText.contains("--wireboundary") && exportText.contains("Content-Type: application/json")
-                        && exportText.contains("name=\"\(created.id)\"") && exportText.contains(created.title)
-                        && exportText.contains("completed") && exportText.contains("--wireboundary--")
-                )
+            // GET /export — @RawRoute(.responseSender) with a sender-transforming middleware: streams the todos
+            // as a multipart/mixed body, one part per todo.
+            let export = try await client.get("/export")
+            #expect(export.status == 200)
+            let exportText = export.bodyText
+            #expect(
+                exportText.contains("--wireboundary") && exportText.contains("Content-Type: application/json")
+                    && exportText.contains("name=\"\(created.id)\"") && exportText.contains(created.title)
+                    && exportText.contains("completed") && exportText.contains("--wireboundary--")
+            )
 
-                // GET /todos/{missing} — the handler throws TodoNotFound; @ErrorResponse maps it to 404.
-                let missing = try await client.get("/todos/does-not-exist")
-                #expect(missing.status == 404)
+            // GET /todos/{missing} — the handler throws TodoNotFound; @ErrorResponse maps it to 404.
+            let missing = try await client.get("/todos/does-not-exist")
+            #expect(missing.status == 404)
 
-                // PATCH /todos/{id} (@Path + @JSONBody)
-                let patched = try await client.patch("/todos/\(created.id)", json: ["completed": true])
-                #expect(patched.status == 200)
-                #expect(try patched.json(Todo.self).completed == true)
+            // PATCH /todos/{id} (@Path + @JSONBody)
+            let patched = try await client.patch("/todos/\(created.id)", json: ["completed": true])
+            #expect(patched.status == 200)
+            #expect(try patched.json(Todo.self).completed == true)
 
-                // GET /todos/stream (@RawRoute) — one SSE event per todo. Add a second so the stream is more than one
-                // write, assert both events are present and there are exactly two, then remove the second.
-                let created2 = try await client.post("/todos", json: ["title": "Walk dog"]).json(Todo.self)
-                let stream = try await client.get("/todos/stream")
-                #expect(stream.status == 200)
-                let events = stream.bodyText
-                #expect(events.contains("data: \(created.id)\n\n") && events.contains("data: \(created2.id)\n\n"))
-                #expect(events.components(separatedBy: "\n\n").filter { !$0.isEmpty }.count == 2)
-                _ = try await client.delete("/todos/\(created2.id)", headers: ["x-api-key": "secret"])
+            // GET /todos/stream (@RawRoute) — one SSE event per todo. Add a second so the stream is more than one
+            // write, assert both events are present and there are exactly two, then remove the second.
+            let created2 = try await client.post("/todos", json: ["title": "Walk dog"]).json(Todo.self)
+            let stream = try await client.get("/todos/stream")
+            #expect(stream.status == 200)
+            let events = stream.bodyText
+            #expect(events.contains("data: \(created.id)\n\n") && events.contains("data: \(created2.id)\n\n"))
+            #expect(events.components(separatedBy: "\n\n").filter { !$0.isEmpty }.count == 2)
+            _ = try await client.delete("/todos/\(created2.id)", headers: ["x-api-key": "secret"])
 
-                // GET /todos?completed=… (@Query) — the todo is completed after the PATCH.
-                let qTrue = try await client.get("/todos?completed=true")
-                let qTrueList = try qTrue.json([Todo].self)
-                #expect(qTrue.status == 200 && qTrueList.count == 1)
-                let qFalse = try await client.get("/todos?completed=false")
-                #expect(try qFalse.json([Todo].self).isEmpty)
+            // GET /todos?completed=… (@Query) — the todo is completed after the PATCH.
+            let qTrue = try await client.get("/todos?completed=true")
+            let qTrueList = try qTrue.json([Todo].self)
+            #expect(qTrue.status == 200 && qTrueList.count == 1)
+            let qFalse = try await client.get("/todos?completed=false")
+            #expect(try qFalse.json([Todo].self).isEmpty)
 
-                // GET /todos with x-limit: 0 (@Header) — caps the list to nothing.
-                let limited = try await client.get("/todos", headers: ["x-limit": "0"])
-                #expect(try limited.json([Todo].self).isEmpty)
+            // GET /todos with x-limit: 0 (@Header) — caps the list to nothing.
+            let limited = try await client.get("/todos", headers: ["x-limit": "0"])
+            #expect(try limited.json([Todo].self).isEmpty)
 
-                // DELETE is guarded by the route-scope @Middleware(RequireAPIKey). Without the key it's 401 and the
-                // handler never runs, but the controller-scope @Middleware(LogRequests) still advances its counter.
-                let observedBefore = requestObservations.load(ordering: .relaxed)
-                let rejected = try await client.delete("/todos/\(created.id)")
-                #expect(rejected.status == 401)
-                #expect(requestObservations.load(ordering: .relaxed) > observedBefore)
+            // DELETE is guarded by the route-scope @Middleware(RequireAPIKey). Without the key it's 401 and the
+            // handler never runs, but the controller-scope @Middleware(LogRequests) still advances its counter.
+            let observedBefore = requestObservations.load(ordering: .relaxed)
+            let rejected = try await client.delete("/todos/\(created.id)")
+            #expect(rejected.status == 401)
+            #expect(requestObservations.load(ordering: .relaxed) > observedBefore)
 
-                // DELETE /todos/{id} (@ResponseStatus(.noContent)) — with the key the handler runs.
-                let deleted = try await client.delete("/todos/\(created.id)", headers: ["x-api-key": "secret"])
-                #expect(deleted.status == 204)
+            // DELETE /todos/{id} (@ResponseStatus(.noContent)) — with the key the handler runs.
+            let deleted = try await client.delete("/todos/\(created.id)", headers: ["x-api-key": "secret"])
+            #expect(deleted.status == 204)
 
-                // GET /todos — now empty
-                let empty = try await client.get("/todos")
-                #expect(try empty.json([Todo].self).isEmpty)
+            // GET /todos — now empty
+            let empty = try await client.get("/todos")
+            #expect(try empty.json([Todo].self).isEmpty)
 
-                // GET /wiring — cross-runtime introspection, served over the same router
-                #expect(try await client.get("/wiring").status == 200)
+            // GET /wiring — cross-runtime introspection, served over the same router
+            #expect(try await client.get("/wiring").status == 200)
 
-                // A route the trie doesn't have → 404
-                #expect(try await client.get("/nope").status == 404)
+            // A route the trie doesn't have → 404
+            #expect(try await client.get("/nope").status == 404)
 
-                // @Scoped(seed: HTTPRequest.self) @Controller("/me") — the request-scoped controller. Without an
-                // x-session header the Session binding throws Unauthenticated at scope entry → 401; with one, the
-                // controller is built fresh per request and returns the identity.
-                #expect(try await client.get("/me").status == 401)
+            // @Scoped(seed: HTTPRequest.self) @Controller("/me") — the request-scoped controller. Without an
+            // x-session header the Session binding throws Unauthenticated at scope entry → 401; with one, the
+            // controller is built fresh per request and returns the identity.
+            #expect(try await client.get("/me").status == 401)
 
-                let aliceResponse = try await client.get("/me", headers: ["x-session": "alice"])
-                let alice = try aliceResponse.json(Me.self)
-                #expect(aliceResponse.status == 200 && alice.user == "user:alice")
+            let aliceResponse = try await client.get("/me", headers: ["x-session": "alice"])
+            let alice = try aliceResponse.json(Me.self)
+            #expect(aliceResponse.status == 200 && alice.user == "user:alice")
 
-                let bob = try await client.get("/me", headers: ["x-session": "bob"]).json(Me.self)
-                #expect(bob.user == "user:bob")
+            let bob = try await client.get("/me", headers: ["x-session": "bob"]).json(Me.self)
+            #expect(bob.user == "user:bob")
 
-                // The @Singleton SessionManager caches a stable id per token, so the same session resolves to the
-                // same id across requests while a different token differs — the request-scope capture-dep.
-                let aliceAgain = try await client.get("/me", headers: ["x-session": "alice"]).json(Me.self)
-                #expect(alice.id == aliceAgain.id)
-                #expect(alice.id != bob.id)
+            // The @Singleton SessionManager caches a stable id per token, so the same session resolves to the
+            // same id across requests while a different token differs — the request-scope capture-dep.
+            let aliceAgain = try await client.get("/me", headers: ["x-session": "alice"]).json(Me.self)
+            #expect(alice.id == aliceAgain.id)
+            #expect(alice.id != bob.id)
         }
     }
 }
