@@ -7,12 +7,6 @@ import Synchronization  // the LogRequests observe-middleware counter
 import Testing
 import WireMVCTesting
 
-#if canImport(Glibc)
-import Glibc
-#elseif canImport(Darwin)
-import Darwin
-#endif
-
 /// The throwaway CouchDB the integration suite runs against — provisioned and torn down by the
 /// `containerTrait`, not by the app. CouchDB 3 won't start without an admin, so `COUCHDB_USER`/
 /// `COUCHDB_PASSWORD` configure the image; the `.log` wait strategy holds until CouchDB is actually up.
@@ -27,31 +21,6 @@ struct TodoContainers {
     var couchdb: RunningContainer
 }
 
-/// Bridges the container-assigned CouchDB endpoint into the graph's environment-read `provideCouchDBClient`
-/// *before* the `.wiremvc(_:)` harness bootstraps. Ordered after `containerTrait` (so the container is up and
-/// `ContainerTestContext.current` is set) and before `.wiremvc(_:)` (so `Wire.bootstrap()` reads these) in the
-/// `@Suite` trait list — the first-listed trait scopes outermost, so `containerTrait ▸ this ▸ .wiremvc(_:)`.
-struct CouchDBEnvTrait: SuiteTrait, TestScoping {
-    let isRecursive = false
-
-    func provideScope(
-        for test: Test,
-        testCase: Test.Case?,
-        performing execute: @concurrent @Sendable () async throws -> Void
-    ) async throws {
-        guard testCase == nil else {
-            try await execute()
-            return
-        }
-        let couchdb = TodoContainers().couchdb  // resolved from ContainerTestContext.current
-        unsafe setenv("COUCHDB_HOST", couchdb.host, 1)
-        unsafe setenv("COUCHDB_PORT", String(try couchdb.mappedPort(5984)), 1)
-        unsafe setenv("COUCHDB_USER", "admin", 1)
-        unsafe setenv("COUCHDB_PASSWORD", "password", 1)
-        try await execute()
-    }
-}
-
 /// The real-backend integration suite: serves the app's **production graph** (the real `CouchDB*` bindings)
 /// through the keyless `@Suite(.wiremvc(.swiftHttpServer))` harness — a `NIOHTTPServer` the harness owns and
 /// binds to an ephemeral loopback port, so nothing has to `@Replaces` the app's `ServerConfig` down to 0 —
@@ -62,8 +31,21 @@ struct CouchDBEnvTrait: SuiteTrait, TestScoping {
 @Suite(
     "SwiftHttpServerExample real backend",
     TodoContainers.containerTrait,
-    CouchDBEnvTrait(),
-    .wiremvc(.swiftHttpServer),
+    .wiremvc(
+        .swiftHttpServer,
+        environment: {
+            // Evaluated at suite entry — after `containerTrait` has started CouchDB and set
+            // `ContainerTestContext.current` — and applied before the harness bootstraps the graph, so the
+            // environment-reading `provideCouchDBClient` sees the container's assigned endpoint.
+            let couchdb = TodoContainers().couchdb
+            return [
+                "COUCHDB_HOST": couchdb.host,
+                "COUCHDB_PORT": String(try couchdb.mappedPort(5984)),
+                "COUCHDB_USER": "admin",
+                "COUCHDB_PASSWORD": "password",
+            ]
+        }
+    ),
     .enabled(if: containerRuntimeAvailable, "A container runtime (Docker) is required"),
     .serialized
 )
