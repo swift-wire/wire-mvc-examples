@@ -6,12 +6,14 @@ import WireMVCTesting
 // The mocked routing suite — routing/controller logic in isolation, no CouchDB and no transport.
 // `@Suite(.wiremvc(key, .inProcess))` builds the app's real router over an in-memory server and calls the
 // finalized handler directly: no socket, no port, and the app's `createServer()` is never involved. The keyed
-// harness is parked for `MockedRoutingBinds.mocks`; each
-// test supplies its per-request smockable doubles with the generated `withBindValues(todoRepository:…,
-// sessionManager:…)`. `/me` is the app's only seed-scoped (`@Scoped(seed:)`) controller, so it's the keyed
-// harness's one variant subject — and it happens to exercise both mocked slots: its handler calls
-// `repository.all()` (the todo op) and `session.id()` → `manager.sessionID(for:)` (the session op). Verifying
-// those interactions proves the request routed through the controller against the mocks, with no backend.
+// harness is parked for `MockedRoutingBinds.mocks`; each test supplies its per-request smockable doubles with
+// `withClient(supplying: <Controller>Doubles(…))`, which hands back that controller's typed client bound to
+// the doubles it just supplied. The doubles are per controller, so each test names only the slots its own
+// controller reaches: `MeController` takes both, `TodosController` and `ExportController` take the repository
+// alone. `/me` is the app's only seed-scoped (`@Scoped(seed:)`) controller and exercises both mocked slots —
+// its handler calls `repository.all()` (the todo op) and `session.id()` → `manager.sessionID(for:)` (the
+// session op). Verifying those interactions proves the request routed through the controller against the
+// mocks, with no backend.
 
 @Suite(.wiremvc(MockedRoutingBinds.mocks, .inProcess))
 struct MockedRoutingTests {
@@ -27,10 +29,13 @@ struct MockedRoutingTests {
         when(sessionExpectations.sessionID(for: .any), return: "mock-session-42")
         let sessionMock = MockMockableSessionManager(expectations: sessionExpectations)
 
-        try await withBindValues(todoRepository: todoMock, sessionManager: sessionMock) {
-            let response = try await TestClient.current.get("/me", headers: ["x-session": "alice"])
-            #expect(response.status == 200)
-            let me = try response.json(Me.self)
+        try await withClient(
+            supplying: MeControllerDoubles(sessionManager: sessionMock, todoRepository: todoMock)
+        ) { meController in
+            // `x-session` is read by the request-scoped `Session` binding off the `HTTPRequest`, not declared
+            // as a `@Header` on the handler — so it is not a typed parameter, but the method still takes extra
+            // headers, which keeps the derived path and decoded response.
+            let me = try await meController.me(headers: ["x-session": "alice"])
             #expect(me.user == "user:alice")
             #expect(me.id == "mock-session-42")  // the session op's mocked answer, not a real store's UUID
         }
@@ -47,9 +52,12 @@ struct MockedRoutingTests {
         let todoMock = MockMockableTodoRepository(expectations: MockMockableTodoRepository.Expectations())
         let sessionMock = MockMockableSessionManager(expectations: MockMockableSessionManager.Expectations())
 
-        try await withBindValues(todoRepository: todoMock, sessionManager: sessionMock) {
-            let response = try await TestClient.current.get("/me")  // no x-session → 401
-            #expect(response.status == 401)
+        try await withClient(
+            supplying: MeControllerDoubles(sessionManager: sessionMock, todoRepository: todoMock)
+        ) { meController in
+            // No `x-session`: the typed method surfaces the 401 as a throw carrying the status.
+            let error = try await #require(throws: WireMVCRouteError.self) { try await meController.me() }
+            #expect(error.status == .unauthorized)
         }
 
         verify(sessionMock, .never).sessionID(for: .any)  // scope-entry throw short-circuits the session op
@@ -65,13 +73,12 @@ struct MockedRoutingTests {
         var todoExpectations = MockMockableTodoRepository.Expectations()
         when(todoExpectations.all(), return: [Todo(id: "42", title: "mock todo", completed: false)])
         let todoMock = MockMockableTodoRepository(expectations: todoExpectations)
-        let sessionMock = MockMockableSessionManager(expectations: MockMockableSessionManager.Expectations())
 
-        try await withBindValues(todoRepository: todoMock, sessionManager: sessionMock) {
-            let response = try await TestClient.current.get("/todos")
-            #expect(response.status == 200)
-            let todos = try response.json([Todo].self)
-            #expect(todos.map(\.id) == ["42"])  // the mock's answer, via the per-request app-scoped controller
+        // Per-controller doubles: `TodosController` never reaches the session slot, so its struct has no field
+        // for it and this test supplies only the repository — no throwaway session mock.
+        try await withClient(supplying: TodosControllerDoubles(todoRepository: todoMock)) { todos in
+            let listed = try await todos.list(completed: nil, limit: nil)
+            #expect(listed.map(\.id) == ["42"])  // the mock's answer, via the per-request app-scoped controller
         }
         verify(todoMock, times: 1).all()
     }
@@ -84,11 +91,13 @@ struct MockedRoutingTests {
         var todoExpectations = MockMockableTodoRepository.Expectations()
         when(todoExpectations.all(), return: [Todo(id: "7", title: "streamed", completed: true)])
         let todoMock = MockMockableTodoRepository(expectations: todoExpectations)
-        let sessionMock = MockMockableSessionManager(expectations: MockMockableSessionManager.Expectations())
 
-        try await withBindValues(todoRepository: todoMock, sessionManager: sessionMock) {
-            let response = try await TestClient.current.get("/export")
-            #expect(response.status == 200)
+        try await withClient(supplying: ExportControllerDoubles(todoRepository: todoMock)) { export in
+            // The raw-route shim: the request line is derived, the payload stays untyped, and a non-2xx is not
+            // treated as a failure — a raw route may answer one by design.
+            try await export.todos { response, _ in
+                #expect(response.status == .ok)
+            }
         }
         verify(todoMock, times: 1).all()  // the raw handler reached the mock through the rebuilt controller
     }
