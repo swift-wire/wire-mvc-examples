@@ -1,6 +1,7 @@
 package import Controllers
 package import SwiftHttpServerExample
 package import Wire
+package import WireTesting
 
 // The mocked routing suite's test-graph variant. One `TestingKey`, two `@BindType` slots binding the app's
 // `TodoRepository` / `SessionManager` to the smockable mocks (declared in `MockableProtocols.swift`), plus the
