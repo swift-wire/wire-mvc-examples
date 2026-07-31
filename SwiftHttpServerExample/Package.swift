@@ -125,6 +125,10 @@ let package = Package(
                 .product(name: "WireMVCTesting", package: "wire-mvc"),
                 .product(name: "Controllers", package: "Controllers"),
                 .product(name: "Wire", package: "swift-wire"),
+                // `TestingKey` + `@BindType`, split out of `Wire` so declaring a test-graph variant is a
+                // dependency a target takes deliberately. Only this suite declares one; the live suite next
+                // door does not, and must not link it.
+                .product(name: "WireTesting", package: "swift-wire"),
                 .product(name: "HTTPAPIs", package: "swift-http-api-proposal"),
                 .product(name: "HTTPTypes", package: "swift-http-types"),
                 .product(name: "Logging", package: "swift-log"),
