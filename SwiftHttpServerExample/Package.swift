@@ -28,11 +28,13 @@ let package = Package(
     platforms: [.macOS(.v26)],
     dependencies: [
         .package(path: "../Controllers"),
+        .package(path: "../OpenAPISpec"),
         // `NIOHTTPServer` switches on WireMVCTesting's `NIOHTTPServer: WireMVCTestServer` conformance and
         // the `.swiftHttpServer` suite mode. Off by default in wire-mvc, so a consumer that doesn't serve on
         // NIO resolves no server package at all — this runtime does, so it opts in.
         .package(url: "https://github.com/tachyonics/wire-mvc.git", branch: "main", traits: ["NIOHTTPServer"]),
         .package(url: "https://github.com/tachyonics/swift-wire.git", branch: "main"),
+        .package(url: "https://github.com/tachyonics/wire-open-api.git", branch: "main"),
         .package(url: "https://github.com/swift-server/swift-http-server.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-http-api-proposal.git", .upToNextMinor(from: "0.2.0")),
         .package(
@@ -59,6 +61,8 @@ let package = Package(
             name: "SwiftHttpServerExample",
             dependencies: [
                 .product(name: "Controllers", package: "Controllers"),
+                .product(name: "OpenAPISpec", package: "OpenAPISpec"),
+                .product(name: "WireOpenAPI", package: "wire-open-api"),
                 .product(name: "WireMVC", package: "wire-mvc"),
                 // The package-provided native router (TrieRouteBuilder / FrozenTrieRouter) — replaces
                 // this runtime's former in-tree TrieRouter copy.
@@ -77,7 +81,14 @@ let package = Package(
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
             ],
             swiftSettings: extraSettings,
-            plugins: [.plugin(name: "WireMVCBuildPlugin", package: "wire-mvc")]
+            // The decomposed three-plugin form, not the bundled `WireMVCBuildPlugin`: that one runs
+            // WireGen and WireMVC's route codegen together, which is right for an app with one adapter
+            // and silently leaves the second adapter's witnesses ungenerated once there are two.
+            plugins: [
+                .plugin(name: "WireBuildPlugin", package: "swift-wire"),
+                .plugin(name: "WireMVCRouteGenPlugin", package: "wire-mvc"),
+                .plugin(name: "WireOpenAPIGenPlugin", package: "wire-open-api"),
+            ]
         ),
         // Real-backend integration suite. Re-composes the app's production graph (the plugin re-parses the
         // app via its `_WireExports.swift` marker) — the real `CouchDB*` bindings, served through the keyless
@@ -95,6 +106,8 @@ let package = Package(
                 .product(name: "WireMVCRouter", package: "wire-mvc"),
                 .product(name: "WireMVCTesting", package: "wire-mvc"),
                 .product(name: "Controllers", package: "Controllers"),
+                .product(name: "OpenAPISpec", package: "OpenAPISpec"),
+                .product(name: "WireOpenAPI", package: "wire-open-api"),
                 .product(name: "Wire", package: "swift-wire"),
                 .product(name: "HTTPAPIs", package: "swift-http-api-proposal"),
                 .product(name: "HTTPTypes", package: "swift-http-types"),
@@ -107,7 +120,14 @@ let package = Package(
                 .product(name: "LocalContainers", package: "swift-local-containers"),
             ],
             swiftSettings: extraSettings,
-            plugins: [.plugin(name: "WireMVCBuildPlugin", package: "wire-mvc")]
+            // The decomposed three-plugin form, not the bundled `WireMVCBuildPlugin`: that one runs
+            // WireGen and WireMVC's route codegen together, which is right for an app with one adapter
+            // and silently leaves the second adapter's witnesses ungenerated once there are two.
+            plugins: [
+                .plugin(name: "WireBuildPlugin", package: "swift-wire"),
+                .plugin(name: "WireMVCRouteGenPlugin", package: "wire-mvc"),
+                .plugin(name: "WireOpenAPIGenPlugin", package: "wire-open-api"),
+            ]
         ),
         // Mocked routing suite — socket-free (`.inProcess`), so it depends on no concrete server at all.
         // It tests route/controller logic, not transport. smockable mocks for `TodoRepository` + `SessionManager` threaded into the

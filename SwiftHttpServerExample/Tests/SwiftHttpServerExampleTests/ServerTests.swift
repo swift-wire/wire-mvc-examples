@@ -102,6 +102,33 @@ struct TodosRoutingTests {
             let events = stream.bodyText
             #expect(events.contains("data: \(created.id)\n\n") && events.contains("data: \(created2.id)\n\n"))
             #expect(events.components(separatedBy: "\n\n").filter { !$0.isEmpty }.count == 2)
+
+            // ---- The OpenAPI half, on the same router and the same backend ----
+            //
+            // Everything above reached `/todos` through `@Get`/`@Post`. These reach `/api/todos` through an
+            // OpenAPI document, and read the todos the annotation-driven routes just wrote — one
+            // `TodoRepository` binding (here CouchDB) serves both, because after M6d an operation *is* a
+            // WireMVC route. Here they register *natively*, onto the trie builder, where the other two
+            // runtimes reach the same routes through the `WireMVCServerTransport` bridge.
+            //
+            // The `/api` prefix comes from the document's `servers:` block, not from the app.
+            let viaSpec = try await client.get("/api/todos")
+            #expect(viaSpec.status == 200)
+            #expect(try viaSpec.json([Todo].self).count == 2, "the operation reads what the @Post routes wrote")
+
+            // Created through the document, read back through the annotation-driven route: interchangeable
+            // over one store. Net-zero, so the counts below still hold.
+            let createdViaSpec = try await client.post("/api/todos", json: ["title": "via the document"])
+            #expect(createdViaSpec.status == 201)
+            let specTodo = try createdViaSpec.json(Todo.self)
+            #expect(try await client.get("/todos/\(specTodo.id)").json(Todo.self).title == "via the document")
+
+            // @ErrorResponse at operation scope, carrying the body the document declares for its 404.
+            let missingViaSpec = try await client.get("/api/todos/does-not-exist")
+            #expect(missingViaSpec.status == 404)
+            #expect(missingViaSpec.bodyText.contains("no such todo"))
+
+            #expect(try await client.delete("/api/todos/\(specTodo.id)").status == 204)
             _ = try await client.delete("/todos/\(created2.id)", headers: ["x-api-key": "secret"])
 
             // GET /todos?completed=… (@Query) — the todo is completed after the PATCH.

@@ -20,8 +20,10 @@ let package = Package(
     platforms: [.macOS(.v26)],
     dependencies: [
         .package(path: "../Controllers"),
+        .package(path: "../OpenAPISpec"),
         .package(url: "https://github.com/tachyonics/wire-mvc.git", branch: "main", traits: ["ServerTransport"]),
         .package(url: "https://github.com/tachyonics/swift-wire.git", branch: "main"),
+        .package(url: "https://github.com/tachyonics/wire-open-api.git", branch: "main"),
         .package(url: "https://github.com/vapor/vapor.git", from: "4.106.0"),
         .package(url: "https://github.com/swift-server/swift-openapi-vapor.git", from: "1.0.0"),
         .package(url: "https://github.com/orlandos-nl/MongoKitten.git", from: "7.0.0"),
@@ -34,8 +36,10 @@ let package = Package(
             name: "VaporExample",
             dependencies: [
                 .product(name: "Controllers", package: "Controllers"),
+                .product(name: "OpenAPISpec", package: "OpenAPISpec"),
                 .product(name: "WireMVC", package: "wire-mvc"),
                 .product(name: "WireMVCServerTransport", package: "wire-mvc"),
+                .product(name: "WireOpenAPI", package: "wire-open-api"),
                 .product(name: "Wire", package: "swift-wire"),
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "OpenAPIVapor", package: "swift-openapi-vapor"),
@@ -45,7 +49,14 @@ let package = Package(
                 // conformance references `any Service`.
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
             ],
-            plugins: [.plugin(name: "WireMVCBuildPlugin", package: "wire-mvc")]
+            // The decomposed three-plugin form, not the bundled `WireMVCBuildPlugin`: that one runs
+            // WireGen and WireMVC's route codegen together, which is right for an app with one adapter
+            // and silently leaves the second adapter's witnesses ungenerated once there are two.
+            plugins: [
+                .plugin(name: "WireBuildPlugin", package: "swift-wire"),
+                .plugin(name: "WireMVCRouteGenPlugin", package: "wire-mvc"),
+                .plugin(name: "WireOpenAPIGenPlugin", package: "wire-open-api"),
+            ]
         ),
         // The integration test provisions a throwaway MongoDB via swift-local-containers'
         // test-support macros (`@Containers`/`@Container` + `containerTrait`), then drives the
