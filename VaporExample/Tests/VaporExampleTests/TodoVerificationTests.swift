@@ -129,6 +129,41 @@ struct TodoVerificationTests {
             #expect(stream.status == .ok)
             #expect(events.contains("data: \(todo.id)\n\n") && events.contains("data: \(todo2.id)\n\n"))
             #expect(events.components(separatedBy: "\n\n").filter { !$0.isEmpty }.count == 2)
+
+            // ---- The OpenAPI half, on the same transport and the same backend ----
+            //
+            // Everything above reached `/todos` through `@Get`/`@Post`. These reach `/api/todos` through
+            // an OpenAPI document, and read the todos the annotation-driven routes just wrote — one
+            // `TodoRepository` binding (here MongoDB) serves both, because after M6d an operation *is* a
+            // WireMVC route. `configure.swift` is unchanged: `WireMVCServerTransport.apply` already
+            // registers every collated contributor, so a second adapter needs nothing added.
+            //
+            // The `/api` prefix comes from the document's `servers:` block, not from the app.
+            let viaSpec = try await execute(.GET, "/api/todos")
+            #expect(viaSpec.status == .ok)
+            #expect(try decode([Todo].self, viaSpec).count == 2, "the operation reads what the @Post routes wrote")
+
+            // Created through the document, read back through the annotation-driven route: interchangeable
+            // over one store, which is the claim worth pinning. Net-zero, so the counts below still hold.
+            let createdViaSpec = try await execute(
+                .POST,
+                "/api/todos",
+                json: true,
+                body: #"{"title":"via the document"}"#
+            )
+            #expect(createdViaSpec.status == .created)
+            let specTodo = try decode(Todo.self, createdViaSpec)
+            let readBack = try await execute(.GET, "/todos/\(specTodo.id)")
+            #expect(try decode(Todo.self, readBack).title == "via the document")
+
+            // @ErrorResponse at operation scope, carrying the body the document declares for its 404 —
+            // the annotation-driven `/todos/does-not-exist` above answers 404 too. One error model.
+            let missingViaSpec = try await execute(.GET, "/api/todos/does-not-exist")
+            #expect(missingViaSpec.status == .notFound)
+            #expect(String(buffer: missingViaSpec.body).contains("no such todo"))
+
+            let deletedViaSpec = try await execute(.DELETE, "/api/todos/\(specTodo.id)")
+            #expect(deletedViaSpec.status == .noContent)
             _ = try await execute(.DELETE, "/todos/\(todo2.id)", extraHeaders: ["x-api-key": "secret"])
 
             // WireMVC: @Query (completed, after the PATCH) and @Header (x-limit caps the list).
@@ -155,6 +190,8 @@ struct TodoVerificationTests {
             let wiring = try await execute(.GET, "/wiring")
             #expect(wiring.status == .ok)
             let model = try decode(WiringModel.self, wiring)
+            // Both controllers are in the one graph — the operations are not a parallel world.
+            #expect(model.bindings.contains { $0.type.contains("TodosOperations") })
             #expect(model.bindings.contains { $0.type.contains("TodosController") })
 
             // @Scoped(seed: HTTPRequest.self) @Controller("/me") — a request-scoped controller alongside

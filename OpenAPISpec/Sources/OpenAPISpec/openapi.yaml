@@ -1,0 +1,131 @@
+openapi: 3.1.0
+info:
+  title: Todos
+  version: 1.0.0
+# The prefix comes from here, not from the app: WireOpenAPI reads `servers:` and registers the
+# operations under it, so these sit alongside the annotation-driven `/todos` routes without colliding.
+servers:
+  - url: /api
+paths:
+  /todos:
+    get:
+      operationId: listTodos
+      parameters:
+        - name: completed
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Every todo, optionally filtered.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Todo'
+    post:
+      operationId: createTodo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTodo'
+      responses:
+        '201':
+          description: The created todo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+  /todos/{id}:
+    get:
+      operationId: getTodo
+      parameters:
+        - $ref: '#/components/parameters/TodoID'
+      responses:
+        '200':
+          description: The todo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+        '404':
+          description: No such todo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    patch:
+      operationId: editTodo
+      parameters:
+        - $ref: '#/components/parameters/TodoID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditTodo'
+      responses:
+        '200':
+          description: The updated todo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+        '404':
+          description: No such todo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      operationId: deleteTodo
+      parameters:
+        - $ref: '#/components/parameters/TodoID'
+      responses:
+        '204':
+          description: Deleted.
+components:
+  # Declared by `$ref` on purpose: a referenced parameter has no `name` key at its use site, which is
+  # what the adapter's original dictionary walk silently dropped. Reading the document with OpenAPIKit
+  # resolves it, and this keeps a live example of the shape that broke.
+  parameters:
+    TodoID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    Todo:
+      type: object
+      required: [id, title, completed]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        completed:
+          type: boolean
+    CreateTodo:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+    EditTodo:
+      type: object
+      properties:
+        title:
+          type: string
+        completed:
+          type: boolean
+    Problem:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string

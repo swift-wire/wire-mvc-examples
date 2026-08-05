@@ -1,0 +1,7 @@
+generate:
+  - types
+  - server
+# public, not internal: the spec lives in its own package, so every runtime executable that mounts it
+# has to see the generated types across a package boundary.
+accessModifier: public
+namingStrategy: idiomatic

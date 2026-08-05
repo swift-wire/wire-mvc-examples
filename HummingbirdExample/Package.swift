@@ -20,8 +20,10 @@ let package = Package(
     platforms: [.macOS(.v26)],
     dependencies: [
         .package(path: "../Controllers"),
+        .package(path: "../OpenAPISpec"),
         .package(url: "https://github.com/tachyonics/wire-mvc.git", branch: "main", traits: ["ServerTransport"]),
         .package(url: "https://github.com/tachyonics/swift-wire.git", branch: "main"),
+        .package(url: "https://github.com/tachyonics/wire-open-api.git", branch: "main"),
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0"),
         .package(url: "https://github.com/swift-server/swift-openapi-hummingbird.git", from: "2.0.0"),
         .package(url: "https://github.com/valkey-io/valkey-swift.git", from: "1.0.0"),
@@ -34,8 +36,10 @@ let package = Package(
             name: "HummingbirdExample",
             dependencies: [
                 .product(name: "Controllers", package: "Controllers"),
+                .product(name: "OpenAPISpec", package: "OpenAPISpec"),
                 .product(name: "WireMVC", package: "wire-mvc"),
                 .product(name: "WireMVCServerTransport", package: "wire-mvc"),
+                .product(name: "WireOpenAPI", package: "wire-open-api"),
                 .product(name: "Wire", package: "swift-wire"),
                 .product(name: "Hummingbird", package: "hummingbird"),
                 .product(name: "OpenAPIHummingbird", package: "swift-openapi-hummingbird"),
@@ -45,7 +49,17 @@ let package = Package(
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
-            plugins: [.plugin(name: "WireMVCBuildPlugin", package: "wire-mvc")]
+            // **Three plugins, not the bundled `WireMVCBuildPlugin`.** That one runs WireGen and WireMVC's
+            // route codegen together, which is right for an app with one adapter and wrong the moment
+            // there are two: applying it here would leave WireOpenAPI's conformers ungenerated, silently.
+            // Decomposed, `WireBuildPlugin` emits the graph exactly once and each adapter contributes only
+            // its own domain generator. `OpenAPIGenerator` itself is not here — the `OpenAPISpec` package
+            // runs it and exports the generated types publicly.
+            plugins: [
+                .plugin(name: "WireBuildPlugin", package: "swift-wire"),
+                .plugin(name: "WireMVCRouteGenPlugin", package: "wire-mvc"),
+                .plugin(name: "WireOpenAPIGenPlugin", package: "wire-open-api"),
+            ]
         ),
         // The integration test provisions a throwaway Valkey via swift-local-containers'
         // test-support macros (`@Containers`/`@Container` + `containerTrait`), then drives the routes

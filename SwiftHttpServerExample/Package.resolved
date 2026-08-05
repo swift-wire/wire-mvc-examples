@@ -1,5 +1,5 @@
 {
-  "originHash" : "c346426af54686b4b6ebed46e11c7ce93481f5fee5654d842bb8a8d30403d9ca",
+  "originHash" : "67bce538a9841b7b7eeb5efc6eac89d2a041099b5a09e6d833af4e57944d1bbc",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -44,6 +44,15 @@
       "state" : {
         "revision" : "176c5a434fd76f6f479848d1a8f7d44967534168",
         "version" : "2.4.1"
+      }
+    },
+    {
+      "identity" : "openapikit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/mattpolzin/OpenAPIKit",
+      "state" : {
+        "revision" : "57b6318128e3f901c93f4fbf98d1c1464ec168d3",
+        "version" : "6.2.0"
       }
     },
     {
@@ -254,6 +263,23 @@
       }
     },
     {
+      "identity" : "swift-openapi-generator",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tachyonics/swift-openapi-generator.git",
+      "state" : {
+        "revision" : "9e655e0adb9b993ef4cb29a6aa0dfc59b9b42b09"
+      }
+    },
+    {
+      "identity" : "swift-openapi-runtime",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-openapi-runtime.git",
+      "state" : {
+        "revision" : "3d3a8457661daf7fb260ceeb9f0e24e5204ba5fb",
+        "version" : "1.12.0"
+      }
+    },
+    {
       "identity" : "swift-protobuf",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-protobuf.git",
@@ -304,7 +330,7 @@
       "location" : "https://github.com/tachyonics/swift-wire.git",
       "state" : {
         "branch" : "main",
-        "revision" : "7cca6d01aae379b0a4224e3427c59c10dcd73ace"
+        "revision" : "049b23ead49a976784eda42e687fd4304a2b9004"
       }
     },
     {
@@ -313,7 +339,25 @@
       "location" : "https://github.com/tachyonics/wire-mvc.git",
       "state" : {
         "branch" : "main",
-        "revision" : "ae72bd109b39adb4640dd981e13606eddfb71b74"
+        "revision" : "33f99d3b1990d44381756f955844991602aee585"
+      }
+    },
+    {
+      "identity" : "wire-open-api",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tachyonics/wire-open-api.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "907136ad387380669a9d3ffffa16fe15249b4d0c"
+      }
+    },
+    {
+      "identity" : "yams",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/jpsim/Yams",
+      "state" : {
+        "revision" : "a27b21e0c81c5bf42049b897a62aaf387e80f279",
+        "version" : "6.2.2"
       }
     },
     {

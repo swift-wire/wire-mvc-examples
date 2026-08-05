@@ -1,5 +1,5 @@
 {
-  "originHash" : "a63b69989467327fd7ee0520a652125583e99be2a671cd8259428320dc9d63ad",
+  "originHash" : "763455852344ecb231ae7a2f5bd7274f406b3b31be2cf3d24f537fec135fb164",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -53,6 +53,15 @@
       "state" : {
         "revision" : "db50d7b5da7709d245120ccc25e094cbf9365260",
         "version" : "2.25.1"
+      }
+    },
+    {
+      "identity" : "openapikit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/mattpolzin/OpenAPIKit",
+      "state" : {
+        "revision" : "57b6318128e3f901c93f4fbf98d1c1464ec168d3",
+        "version" : "6.2.0"
       }
     },
     {
@@ -254,6 +263,14 @@
       }
     },
     {
+      "identity" : "swift-openapi-generator",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tachyonics/swift-openapi-generator.git",
+      "state" : {
+        "revision" : "9e655e0adb9b993ef4cb29a6aa0dfc59b9b42b09"
+      }
+    },
+    {
       "identity" : "swift-openapi-hummingbird",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swift-server/swift-openapi-hummingbird.git",
@@ -322,7 +339,7 @@
       "location" : "https://github.com/tachyonics/swift-wire.git",
       "state" : {
         "branch" : "main",
-        "revision" : "7cca6d01aae379b0a4224e3427c59c10dcd73ace"
+        "revision" : "049b23ead49a976784eda42e687fd4304a2b9004"
       }
     },
     {
@@ -340,7 +357,25 @@
       "location" : "https://github.com/tachyonics/wire-mvc.git",
       "state" : {
         "branch" : "main",
-        "revision" : "ae72bd109b39adb4640dd981e13606eddfb71b74"
+        "revision" : "33f99d3b1990d44381756f955844991602aee585"
+      }
+    },
+    {
+      "identity" : "wire-open-api",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tachyonics/wire-open-api.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "907136ad387380669a9d3ffffa16fe15249b4d0c"
+      }
+    },
+    {
+      "identity" : "yams",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/jpsim/Yams",
+      "state" : {
+        "revision" : "a27b21e0c81c5bf42049b897a62aaf387e80f279",
+        "version" : "6.2.2"
       }
     },
     {
