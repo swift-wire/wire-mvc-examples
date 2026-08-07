@@ -181,12 +181,20 @@ struct TodosRoutingTests {
             let bobCookie = try #require(sessionCookieToken(from: bobLogin))
             let bob = try await client.get("/me", headers: ["Cookie": "session=\(bobCookie)"]).json(Me.self)
 
-            // The @Singleton SessionManager caches a stable id per token, so the same cookie resolves to the
-            // same id across requests while a different one differs — the request-scope capture-dep.
+            // The same cookie resolves to the same identity across requests, and a different one to a
+            // different identity — the request-scope capture-dep, asserted on `user`, which is derived from
+            // the cookie itself.
+            //
+            // Deliberately *not* asserted on `id`: that is minted by the store on first sight and read back
+            // thereafter, so comparing it across two requests asserts the store's read-after-write rather
+            // than anything about sessions. The old test got away with it because its token was the literal
+            // "alice" — a document any earlier run had already created — so the write path was never on the
+            // critical path. A per-login token puts it there, and a store that is at all eventually
+            // consistent will flake. Store consistency wants its own test against the store, not this one.
             let aliceAgain = try await client.get("/me", headers: ["Cookie": "session=\(aliceCookie)"])
                 .json(Me.self)
-            #expect(alice.id == aliceAgain.id)
-            #expect(alice.id != bob.id)
+            #expect(alice.user == aliceAgain.user)
+            #expect(alice.user != bob.user)
 
             // Logout clears it: a bodiless response tuple, `Max-Age=0`, and no response annotation at all.
             let loggedOut = try await client.post("/session/logout", json: Credentials(user: "alice"))
