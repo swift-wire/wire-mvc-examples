@@ -173,14 +173,14 @@ struct TodosRoutingTests {
             #expect(aliceLogin.status == 200)
             let aliceCookie = try #require(sessionCookieToken(from: aliceLogin))
 
-            print("|||||||||||||| alice execute")
+            print("|||||||||||||| alice execute - session=\(aliceCookie)")
             let aliceResponse = try await client.get("/me", headers: ["Cookie": "session=\(aliceCookie)"])
             let alice = try aliceResponse.json(Me.self)
             #expect(aliceResponse.status == 200)
 
             let bobLogin = try await client.post("/session/login", json: Credentials(user: "bob"))
             let bobCookie = try #require(sessionCookieToken(from: bobLogin))
-            print("|||||||||||||| bob execute")
+            print("|||||||||||||| bob execute - session=\(bobCookie)")
             let bob = try await client.get("/me", headers: ["Cookie": "session=\(bobCookie)"]).json(Me.self)
 
             // The same cookie resolves to the same identity across requests, and a different one to a
@@ -193,7 +193,7 @@ struct TodosRoutingTests {
             // "alice" — a document any earlier run had already created — so the write path was never on the
             // critical path. A per-login token puts it there, and a store that is at all eventually
             // consistent will flake. Store consistency wants its own test against the store, not this one.
-            print("|||||||||||||| aliceAgain execute")
+            print("|||||||||||||| aliceAgain execute - session=\(aliceCookie)")
             let aliceAgain = try await client.get("/me", headers: ["Cookie": "session=\(aliceCookie)"])
                 .json(Me.self)
             #expect(alice.user == aliceAgain.user)
