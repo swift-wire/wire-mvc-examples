@@ -181,20 +181,22 @@ struct TodosRoutingTests {
             let bobCookie = try #require(sessionCookieToken(from: bobLogin))
             let bob = try await client.get("/me", headers: ["Cookie": "session=\(bobCookie)"]).json(Me.self)
 
-            // The same cookie resolves to the same session across requests, and a different cookie to a
-            // different one — the request-scope capture-dep.
-            //
-            // Both halves are asserted because they fail for different reasons, and a failure that names
-            // which half broke is worth the extra line. `user` is derived from the cookie the request
-            // carried, so it pins the client→server plumbing; `id` is minted by the store on first sight and
-            // read back after, so it pins that login persisted the token. When these last diverged, `user`
-            // was the one that had broken — the test client was rewriting the `Cookie` header — and only a
-            // round of debug prints established that, which asserting both would have said outright.
             let aliceAgain = try await client.get("/me", headers: ["Cookie": "session=\(aliceCookie)"])
                 .json(Me.self)
-            #expect(alice.user == aliceAgain.user)
+
+            // Asserted against the cookie that was *sent*, not just across responses. `user` is the token
+            // the `Session` binding read off the request, so `user == "user:<sent>"` says the cookie
+            // survived the trip — and names which request it failed on. Comparing the two responses to each
+            // other only says they disagree, which is what left the last two failures ambiguous between
+            // "the client rewrote the header" and "the store lost the token".
+            #expect(alice.user == "user:\(aliceCookie)", "request 1 received a cookie it was not sent")
+            #expect(bob.user == "user:\(bobCookie)", "request 2 received a cookie it was not sent")
+            #expect(aliceAgain.user == "user:\(aliceCookie)", "request 3 received a cookie it was not sent")
+
+            // Then the session itself: the store minted an id at login and hands the same one back for the
+            // same token. This can only be trusted once the assertions above hold — if the cookie did not
+            // survive, an id mismatch says nothing about the store.
             #expect(alice.id == aliceAgain.id)
-            #expect(alice.user != bob.user)
             #expect(alice.id != bob.id)
 
             // Logout clears it: a bodiless response tuple, `Max-Age=0`, and no response annotation at all.
