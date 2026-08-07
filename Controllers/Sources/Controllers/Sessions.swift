@@ -79,7 +79,6 @@ public struct Session<Manager: SessionManager>: Sendable {
         }
         self.token = token
         self.user = "user:\(token)"
-        print(">>>>>>>>>>>>>> self.user = user:\(token)")
         self.manager = manager
     }
 

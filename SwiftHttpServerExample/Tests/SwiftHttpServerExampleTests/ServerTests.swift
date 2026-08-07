@@ -173,35 +173,30 @@ struct TodosRoutingTests {
             #expect(aliceLogin.status == 200)
             let aliceCookie = try #require(sessionCookieToken(from: aliceLogin))
 
-            print("|||||||||||||| alice execute - session=\(aliceCookie)")
             let aliceResponse = try await client.get("/me", headers: ["Cookie": "session=\(aliceCookie)"])
             let alice = try aliceResponse.json(Me.self)
             #expect(aliceResponse.status == 200)
 
             let bobLogin = try await client.post("/session/login", json: Credentials(user: "bob"))
             let bobCookie = try #require(sessionCookieToken(from: bobLogin))
-            print("|||||||||||||| bob execute - session=\(bobCookie)")
             let bob = try await client.get("/me", headers: ["Cookie": "session=\(bobCookie)"]).json(Me.self)
 
-            // The same cookie resolves to the same identity across requests, and a different one to a
-            // different identity — the request-scope capture-dep, asserted on `user`, which is derived from
-            // the cookie itself.
+            // The same cookie resolves to the same session across requests, and a different cookie to a
+            // different one — the request-scope capture-dep.
             //
-            // Deliberately *not* asserted on `id`: that is minted by the store on first sight and read back
-            // thereafter, so comparing it across two requests asserts the store's read-after-write rather
-            // than anything about sessions. The old test got away with it because its token was the literal
-            // "alice" — a document any earlier run had already created — so the write path was never on the
-            // critical path. A per-login token puts it there, and a store that is at all eventually
-            // consistent will flake. Store consistency wants its own test against the store, not this one.
-            print("|||||||||||||| aliceAgain execute - session=\(aliceCookie)")
+            // Both halves are asserted because they fail for different reasons, and a failure that names
+            // which half broke is worth the extra line. `user` is derived from the cookie the request
+            // carried, so it pins the client→server plumbing; `id` is minted by the store on first sight and
+            // read back after, so it pins that login persisted the token. When these last diverged, `user`
+            // was the one that had broken — the test client was rewriting the `Cookie` header — and only a
+            // round of debug prints established that, which asserting both would have said outright.
             let aliceAgain = try await client.get("/me", headers: ["Cookie": "session=\(aliceCookie)"])
                 .json(Me.self)
             #expect(alice.user == aliceAgain.user)
+            #expect(alice.id == aliceAgain.id)
             #expect(alice.user != bob.user)
+            #expect(alice.id != bob.id)
 
-            print("<<<<<<<<<<<<<< aliceCookie = \(aliceCookie)")
-            print("<<<<<<<<<<<<<< alice.user = \(alice.user)")
-            print("<<<<<<<<<<<<<< aliceAgain.user = \(aliceAgain.user)")
 
             // Logout clears it: a bodiless response tuple, `Max-Age=0`, and no response annotation at all.
             let loggedOut = try await client.post("/session/logout", json: Credentials(user: "alice"))
