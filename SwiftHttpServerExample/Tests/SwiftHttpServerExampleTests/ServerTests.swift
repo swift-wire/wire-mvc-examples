@@ -197,7 +197,6 @@ struct TodosRoutingTests {
             #expect(alice.user != bob.user)
             #expect(alice.id != bob.id)
 
-
             // Logout clears it: a bodiless response tuple, `Max-Age=0`, and no response annotation at all.
             let loggedOut = try await client.post("/session/logout", json: Credentials(user: "alice"))
             #expect(loggedOut.status == 204)
