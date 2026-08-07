@@ -103,19 +103,24 @@ where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields?, Sender.Wr
         input: consuming Input,
         next: (consuming NextInput) async throws -> Return
     ) async throws -> Return {
-        try await input.withContents(
+        // Read the response-header registry off the box before consuming it, and thread the same one into
+        // the rebuilt box. It is a required parameter precisely so a transforming middleware cannot forget:
+        // dropping it would silently discard every header field contributed upstream of here.
+        let responseHeaders = input.responseHeaders
+        return try await input.withContents(
             pending: { request, requestContext, reader, responseSender in
                 try await next(
                     .pending(
                         request: request,
                         requestContext: requestContext,
                         reader: reader,
-                        responseSender: MultiPartSender(wrapping: responseSender)
+                        responseSender: MultiPartSender(wrapping: responseSender),
+                        responseHeaders: responseHeaders
                     )
                 )
             },
             responded: { request in
-                try await next(.responded(request: request))
+                try await next(.responded(request: request, responseHeaders: responseHeaders))
             }
         )
     }

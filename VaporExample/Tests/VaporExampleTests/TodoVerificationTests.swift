@@ -196,19 +196,19 @@ struct TodoVerificationTests {
 
             // @Scoped(seed: HTTPRequest.self) @Controller("/me") — a request-scoped controller alongside
             // the @Singleton TodosController, here through the ServerTransport adapter. The request-scoped
-            // Session throws Unauthenticated at scope construction when there is no x-session, and
+            // Session throws Unauthenticated at scope construction when the request carries no session cookie, and
             // @ErrorResponse(Unauthenticated.self, .unauthorized) maps it to 401 (throw-at-scope-entry, no
             // gate); with a session the controller is built fresh per request from the request-scoped
             // Session, so two requests see two identities.
             let noSession = try await execute(.GET, "/me")
             #expect(noSession.status == .unauthorized)
 
-            let alice = try await execute(.GET, "/me", extraHeaders: ["x-session": "alice"])
+            let alice = try await execute(.GET, "/me", extraHeaders: ["Cookie": "session=alice"])
             #expect(alice.status == .ok)
             let aliceMe = try decode(Me.self, alice)
             #expect(aliceMe.user == "user:alice")
 
-            let bob = try await execute(.GET, "/me", extraHeaders: ["x-session": "bob"])
+            let bob = try await execute(.GET, "/me", extraHeaders: ["Cookie": "session=bob"])
             #expect(bob.status == .ok)
             let bobMe = try decode(Me.self, bob)
             #expect(bobMe.user == "user:bob")
@@ -217,7 +217,7 @@ struct TodoVerificationTests {
             // shared: it caches a UUID per token, so re-requesting with the same session returns the SAME id
             // (a fresh-per-request manager would mint a new UUID each time), while a different token differs.
             // This is the request-scope capture-dep, here through the adapter.
-            let aliceAgain = try await execute(.GET, "/me", extraHeaders: ["x-session": "alice"])
+            let aliceAgain = try await execute(.GET, "/me", extraHeaders: ["Cookie": "session=alice"])
             #expect(try decode(Me.self, aliceAgain).id == aliceMe.id)
             #expect(aliceMe.id != bobMe.id)
         }

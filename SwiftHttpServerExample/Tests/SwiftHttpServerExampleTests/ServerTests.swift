@@ -163,23 +163,47 @@ struct TodosRoutingTests {
             // A route the trie doesn't have → 404
             #expect(try await client.get("/nope").status == 404)
 
-            // @Scoped(seed: HTTPRequest.self) @Controller("/me") — the request-scoped controller. Without an
-            // x-session header the Session binding throws Unauthenticated at scope entry → 401; with one, the
-            // controller is built fresh per request and returns the identity.
+            // @Scoped(seed: HTTPRequest.self) @Controller("/me") — the request-scoped controller. With no
+            // session cookie the Session binding throws Unauthenticated at scope entry → 401.
             #expect(try await client.get("/me").status == 401)
 
-            let aliceResponse = try await client.get("/me", headers: ["x-session": "alice"])
+            // The real cookie round trip: log in, read the token back out of `Set-Cookie`, and replay it.
+            // This is what a browser does on its own, and what a bespoke header could never demonstrate.
+            let aliceLogin = try await client.post("/session/login", json: Credentials(user: "alice"))
+            #expect(aliceLogin.status == 200)
+            let aliceCookie = try #require(sessionCookieToken(from: aliceLogin))
+
+            let aliceResponse = try await client.get("/me", headers: ["Cookie": "session=\(aliceCookie)"])
             let alice = try aliceResponse.json(Me.self)
-            #expect(aliceResponse.status == 200 && alice.user == "user:alice")
+            #expect(aliceResponse.status == 200)
 
-            let bob = try await client.get("/me", headers: ["x-session": "bob"]).json(Me.self)
-            #expect(bob.user == "user:bob")
+            let bobLogin = try await client.post("/session/login", json: Credentials(user: "bob"))
+            let bobCookie = try #require(sessionCookieToken(from: bobLogin))
+            let bob = try await client.get("/me", headers: ["Cookie": "session=\(bobCookie)"]).json(Me.self)
 
-            // The @Singleton SessionManager caches a stable id per token, so the same session resolves to the
-            // same id across requests while a different token differs — the request-scope capture-dep.
-            let aliceAgain = try await client.get("/me", headers: ["x-session": "alice"]).json(Me.self)
+            // The @Singleton SessionManager caches a stable id per token, so the same cookie resolves to the
+            // same id across requests while a different one differs — the request-scope capture-dep.
+            let aliceAgain = try await client.get("/me", headers: ["Cookie": "session=\(aliceCookie)"])
+                .json(Me.self)
             #expect(alice.id == aliceAgain.id)
             #expect(alice.id != bob.id)
+
+            // Logout clears it: a bodiless response tuple, `Max-Age=0`, and no response annotation at all.
+            let loggedOut = try await client.post("/session/logout", json: Credentials(user: "alice"))
+            #expect(loggedOut.status == 204)
+            #expect(loggedOut.head?.headerFields[values: .setCookie].contains { $0.contains("Max-Age=0") } == true)
         }
     }
+}
+
+/// Pull the session token out of a login response's `Set-Cookie`. Read with `[values:]`, never the
+/// single-value subscript — that one joins with ", " and does not special-case `Set-Cookie`, so a response
+/// carrying two cookies would come back as one unparseable string.
+private func sessionCookieToken(from response: TestResponse) -> String? {
+    for field in response.head?.headerFields[values: .setCookie] ?? [] {
+        guard field.hasPrefix("session=") else { continue }
+        let value = field.dropFirst("session=".count)
+        return String(value.prefix { $0 != ";" })
+    }
+    return nil
 }

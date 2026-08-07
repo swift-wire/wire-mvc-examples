@@ -219,7 +219,7 @@ struct TodoVerificationTests {
 
             // @Scoped(seed: HTTPRequest.self) @Controller("/me") — a request-scoped controller alongside
             // the @Singleton TodosController, here through the ServerTransport adapter. The request-scoped
-            // Session throws Unauthenticated at scope construction when there is no x-session, and
+            // Session throws Unauthenticated at scope construction when the request carries no session cookie, and
             // @ErrorResponse(Unauthenticated.self, .unauthorized) maps it to 401 (throw-at-scope-entry, no
             // gate); with a session the controller is built fresh per request from the request-scoped
             // Session, so two requests see two identities.
@@ -229,13 +229,13 @@ struct TodoVerificationTests {
             let alice = try await client.execute(
                 uri: "/me",
                 method: .get,
-                headers: [HTTPField.Name("x-session")!: "alice"]
+                headers: [.cookie: "session=alice"]
             )
             #expect(alice.status == .ok)
             let aliceMe = try decode(Me.self, alice)
             #expect(aliceMe.user == "user:alice")
 
-            let bob = try await client.execute(uri: "/me", method: .get, headers: [HTTPField.Name("x-session")!: "bob"])
+            let bob = try await client.execute(uri: "/me", method: .get, headers: [.cookie: "session=bob"])
             #expect(bob.status == .ok)
             let bobMe = try decode(Me.self, bob)
             #expect(bobMe.user == "user:bob")
@@ -247,7 +247,7 @@ struct TodoVerificationTests {
             let aliceAgain = try await client.execute(
                 uri: "/me",
                 method: .get,
-                headers: [HTTPField.Name("x-session")!: "alice"]
+                headers: [.cookie: "session=alice"]
             )
             #expect(try decode(Me.self, aliceAgain).id == aliceMe.id)
             #expect(aliceMe.id != bobMe.id)

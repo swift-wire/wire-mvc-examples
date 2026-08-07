@@ -17,7 +17,7 @@ import WireMVCTesting
 
 @Suite(.wiremvc(MockedRoutingBinds.mocks, .inProcess))
 struct MockedRoutingTests {
-    /// `GET /me` with an `x-session` header: the request-scoped `MeController` is built fresh, injecting the
+    /// `GET /me` with a session cookie: the request-scoped `MeController` is built fresh, injecting the
     /// mocked `TodoRepository` directly and the mocked `SessionManager` through its `Session`. The response
     /// carries the session op's mocked id, and both mocks record exactly the calls the controller made.
     @Test func meRouteThreadsBothMocks() async throws {
@@ -32,17 +32,18 @@ struct MockedRoutingTests {
         try await withClient(
             supplying: MeControllerDoubles(sessionManager: sessionMock, todoRepository: todoMock)
         ) { meController in
-            // `x-session` is read by the request-scoped `Session` binding off the `HTTPRequest`, not declared
-            // as a `@Header` on the handler — so it is not a typed parameter, but the method still takes extra
-            // headers, which keeps the derived path and decoded response.
-            let me = try await meController.me(headers: ["x-session": "alice"])
+            // The session cookie is read by the request-scoped `Session` binding off the `HTTPRequest`, not
+            // declared as a `@Header` on the handler — so it is not a typed parameter, but the method still
+            // takes extra headers, which keeps the derived path and decoded response. Sent as a real `Cookie`
+            // field, the same way the browser would.
+            let me = try await meController.me(headers: ["Cookie": "session=alice"])
             #expect(me.user == "user:alice")
             #expect(me.id == "mock-session-42")  // the session op's mocked answer, not a real store's UUID
         }
 
         // The exact instances recorded the exact calls the controller made — routing exercised, no backend.
         verify(todoMock, times: 1).all()  // the todo op
-        verify(sessionMock, times: 1).sessionID(for: "alice")  // the session op, keyed on the header token
+        verify(sessionMock, times: 1).sessionID(for: "alice")  // the session op, keyed on the cookie token
     }
 
     /// `GET /me` without an `x-session` header: the `Session` binding throws `Unauthenticated` at scope entry,
