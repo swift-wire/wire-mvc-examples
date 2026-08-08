@@ -4,6 +4,7 @@ import Logging
 package import NIOHTTPServer
 package import Wire
 package import WireMVC
+package import WireMVCMiddleware
 import WireMVCRouter
 
 // The WireMVC-native composition root. `@Singleton` makes it a graph binding (its `@Inject` resolves);
@@ -18,7 +19,19 @@ import WireMVCRouter
 
 @Singleton
 @WireMVCBootstrap
+@Middleware(CORSMiddlewareKeys.factory)  // global: every route and the fallback alike
 package struct AppBootstrap {
+    /// The CORS middleware's dependency, resolved from the graph like any other. `.oneOf` with credentials
+    /// is the combination worth showing: allowed *because* it names one origin per response, where `.all`
+    /// with credentials traps at construction.
+    @Provides package static let cors = CORSConfiguration(
+        allowOrigin: .oneOf(["https://allowed.example"]),
+        allowMethods: [.get, .post, .delete],
+        allowHeaders: [.contentType, .init("x-session")!],
+        allowCredentials: true,
+        maxAge: .seconds(600)
+    )
+
     @Inject let config: ServerConfig
 
     // Returns the *concrete* server, not `some HTTPServer`: the proposal's `Reader`/`ResponseSender`

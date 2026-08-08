@@ -67,6 +67,10 @@ let package = Package(
                 // The package-provided native router (TrieRouteBuilder / FrozenTrieRouter) — replaces
                 // this runtime's former in-tree TrieRouter copy.
                 .product(name: "WireMVCRouter", package: "wire-mvc"),
+                // Opt-in middleware: CORS as a global @Middleware on the composition root. Only this runtime
+                // has one — Hummingbird and Vapor mount through WireMVCServerTransport onto their own
+                // Application, so there is no generated @main and therefore no global tier to fold into.
+                .product(name: "WireMVCMiddleware", package: "wire-mvc"),
                 .product(name: "Wire", package: "swift-wire"),
                 .product(name: "NIOHTTPServer", package: "swift-http-server"),
                 .product(name: "HTTPAPIs", package: "swift-http-api-proposal"),
@@ -104,6 +108,10 @@ let package = Package(
                 // app's graph, and so the generated `.wiremvc(_:)` factory's references resolve.
                 .product(name: "WireMVC", package: "wire-mvc"),
                 .product(name: "WireMVCRouter", package: "wire-mvc"),
+                // Opt-in middleware: CORS as a global @Middleware on the composition root. Only this runtime
+                // has one — Hummingbird and Vapor mount through WireMVCServerTransport onto their own
+                // Application, so there is no generated @main and therefore no global tier to fold into.
+                .product(name: "WireMVCMiddleware", package: "wire-mvc"),
                 .product(name: "WireMVCTesting", package: "wire-mvc"),
                 .product(name: "Controllers", package: "Controllers"),
                 .product(name: "OpenAPISpec", package: "OpenAPISpec"),
@@ -142,6 +150,10 @@ let package = Package(
                 "SwiftHttpServerExample",
                 .product(name: "WireMVC", package: "wire-mvc"),
                 .product(name: "WireMVCRouter", package: "wire-mvc"),
+                // Opt-in middleware: CORS as a global @Middleware on the composition root. Only this runtime
+                // has one — Hummingbird and Vapor mount through WireMVCServerTransport onto their own
+                // Application, so there is no generated @main and therefore no global tier to fold into.
+                .product(name: "WireMVCMiddleware", package: "wire-mvc"),
                 .product(name: "WireMVCTesting", package: "wire-mvc"),
                 .product(name: "Controllers", package: "Controllers"),
                 .product(name: "Wire", package: "swift-wire"),
