@@ -62,6 +62,13 @@ struct TodosRoutingTests {
             #expect(create.status == 201)
             let created = try create.json(Todo.self)
             #expect(created.title == "Buy milk" && created.completed == false)
+            // 201 carries a `Location` naming what was created — computed by the handler and returned in its
+            // response tuple, while `@JSONResponse(status: .created)` still supplies the status.
+            #expect(create.head?.headerFields[.location] == "/todos/\(created.id)")
+            // And the route it names is real: the canonical answer is only useful if it resolves.
+            let followed = try await client.get("/todos/\(created.id)")
+            #expect(followed.status == 200)
+            #expect(try followed.json(Todo.self).id == created.id)
 
             // GET /todos (@JSONResponse list)
             let list = try await client.get("/todos")
