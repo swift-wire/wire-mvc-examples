@@ -160,6 +160,28 @@ struct TodosRoutingTests {
             // GET /wiring — cross-runtime introspection, served over the same router
             #expect(try await client.get("/wiring").status == 200)
 
+            // CORS as a global @Middleware on the composition root: it wraps every route, so a listed
+            // origin gets its fields on an ordinary response. Only this runtime has a global tier —
+            // Hummingbird and Vapor mount onto their own Application, with no generated @main to fold into.
+            let cors = try await client.get("/todos", headers: ["Origin": "https://allowed.example"])
+            #expect(cors.head?.headerFields[.accessControlAllowOrigin] == "https://allowed.example")
+            #expect(cors.head?.headerFields[.accessControlAllowCredentials] == "true")
+            #expect(cors.head?.headerFields[values: .vary].contains("Origin") == true)
+
+            // The preflight is answered by the middleware rather than routed — /todos has no OPTIONS route.
+            let preflight = try await client.send(
+                "OPTIONS",
+                "/todos",
+                headers: ["Origin": "https://allowed.example", "Access-Control-Request-Method": "POST"]
+            )
+            #expect(preflight.status == 204)
+            #expect(preflight.head?.headerFields[.accessControlMaxAge] == "600")
+            #expect(preflight.head?.headerFields[.accessControlAllowOrigin] == "https://allowed.example")
+
+            // An unlisted origin is answered without the field rather than echoed.
+            let disallowed = try await client.get("/todos", headers: ["Origin": "https://evil.example"])
+            #expect(disallowed.head?.headerFields[.accessControlAllowOrigin] == nil)
+
             // A route the trie doesn't have → 404
             #expect(try await client.get("/nope").status == 404)
 
