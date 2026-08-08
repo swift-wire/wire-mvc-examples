@@ -75,7 +75,7 @@ The same goes for `OpenAPISpec`: one document, one `@OpenAPIController`, three r
 - **Request-scoped controllers, and authentication as scope construction.**
   `@Scoped(seed: HTTPRequest.self) @Controller("/me")` is built fresh per request from the request that
   opened the scope, alongside the app-`@Singleton` `TodosController` in one graph. Its request-scoped
-  `Session` *throws* `Unauthenticated` at scope entry when there is no `x-session` header, and
+  `Session` *throws* `Unauthenticated` at scope entry when the request carries no session cookie, and
   `@ErrorResponse(Unauthenticated.self, .unauthorized)` maps that to 401 — no gate, no double-read, no
   sentinel. A binding that fails to build maps exactly like a handler throw; gates are reserved for
   authorization. The token→session-id mapping lives in each runtime's own database behind a
