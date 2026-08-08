@@ -43,10 +43,21 @@ public struct TodosController<Repository: TodoRepository>: Sendable {
         return todo
     }
 
+    /// `201 Created` with a `Location` naming what was created — the canonical answer to a POST that
+    /// creates, and the reason a route needs to compute a header field rather than only declare one.
+    ///
+    /// The returned tuple names `headers` but not `status`, so `@JSONResponse(status: .created)` still owns
+    /// the status: the annotation is the declared answer, and the tuple supplies only what the handler has
+    /// to compute. Naming `status` here too would be rejected — the annotation's argument would then be
+    /// dead, and the codegen refuses to let it silently be.
     @Post
     @JSONResponse(status: .created)
-    public func create(@JSONBody input: CreateTodo) async throws -> Todo {
-        try await repository.create(input)
+    public func create(@JSONBody input: CreateTodo) async throws -> (headers: HTTPFields, body: Todo) {
+        let todo = try await repository.create(input)
+        // The prefix is written out rather than derived: `@Controller("/todos")` is compile-time text the
+        // handler has no runtime access to, so a route that builds a URL to itself restates it. Worth
+        // knowing before someone reaches for a helper that does not exist.
+        return ([.location: "/todos/\(todo.id)"], todo)
     }
 
     @Patch("/{id}")
