@@ -15,6 +15,7 @@ public import WireMVC
 @TestScopable  // app-scoped, but rebuilt per-request under a keyed suite so `/todos` is mock-testable
 @Singleton
 @Controller("/todos")
+@Middleware(ControllerMiddleware.responseDefaults)  // controller-scope: .set + .setIfAbsent
 @Middleware(ControllerMiddleware.logRequests)  // controller-scope: every route
 @Middleware(ControllerMiddleware.audit)  // controller-scope, generic-with-deps, non-canonical parameter order
 @ErrorResponse(TodoNotFound.self, .notFound)  // handler throw (use-case-2) → 404, not the baseline 500
@@ -24,16 +25,18 @@ public struct TodosController<Repository: TodoRepository>: Sendable {
     /// `@Query completed` filters and the `x-limit` `@Header` caps the count — both optional (via
     /// Swift-native defaults) and both `LosslessStringConvertible`-converted, so a bare `GET /todos`
     /// still returns everything.
+    /// Returns its own `Cache-Control`, which the controller's `.setIfAbsent` default then defers to — the
+    /// point of that verb. Every sibling route, saying nothing, gets `no-store` instead.
     @Get
     @JSONResponse
     public func list(
         @Query completed: Bool? = nil,
         @Header("x-limit") limit: Int? = nil
-    ) async throws -> [Todo] {
+    ) async throws -> (headers: HTTPFields, body: [Todo]) {
         var todos = try await repository.all()
         if let completed { todos = todos.filter { $0.completed == completed } }
         if let limit { todos = Array(todos.prefix(limit)) }
-        return todos
+        return ([.cacheControl: "no-cache"], todos)
     }
 
     @Get("/{id}")

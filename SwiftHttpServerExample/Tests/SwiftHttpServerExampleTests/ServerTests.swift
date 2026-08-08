@@ -70,6 +70,17 @@ struct TodosRoutingTests {
             #expect(followed.status == 200)
             #expect(try followed.json(Todo.self).id == created.id)
 
+            // The two verbs, on one controller. `x-content-type-options` is `.set`, so the middleware is
+            // authoritative everywhere. `Cache-Control` is `.setIfAbsent`: `list` answers with its own and
+            // keeps it, while a route that says nothing gets the middleware's default.
+            let listed = try await client.get("/todos")
+            #expect(listed.head?.headerFields[.init("x-content-type-options")!] == "nosniff")
+            #expect(listed.head?.headerFields[.cacheControl] == "no-cache", "the route's own answer wins")
+
+            let defaulted = try await client.get("/todos/\(created.id)")
+            #expect(defaulted.head?.headerFields[.init("x-content-type-options")!] == "nosniff")
+            #expect(defaulted.head?.headerFields[.cacheControl] == "no-store", "the middleware's default")
+
             // GET /todos (@JSONResponse list)
             let list = try await client.get("/todos")
             #expect(list.status == 200)
