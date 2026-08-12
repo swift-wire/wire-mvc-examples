@@ -9,53 +9,69 @@ on:
 # Every runtime is now proposal-native (Swift 6.4): each serves the shared, framework-free
 # `Controllers` — SwiftHttpServerExample directly on the swift-http-api-proposal server, Hummingbird
 # and Vapor on their `ServerTransport` via the WireMVCServerTransport adapter (the wire-mvc
-# `ServerTransport` trait, enabled in their manifests). So CI runs entirely on the Swift 6.4 nightly
+# `ServerTransport` trait, enabled in their manifests). So CI runs entirely on the Swift 6.4 snapshot pinned in `.swift-version`
 # container (SwiftyLab/setup-swift installs released toolchains only). Each package is its own SPM
 # package (isolated dependency tree), so the jobs matrix over them, each built/linted in its directory.
 jobs:
   Build:
-    name: ${{ matrix.package }} / Swift 6.4 nightly
+    name: ${{ matrix.package }} / Swift 6.4 (pinned)
     strategy:
       fail-fast: false
       matrix:
         package: [Controllers, OpenAPISpec, HummingbirdExample, VaporExample, SwiftHttpServerExample]
     runs-on: ubuntu-24.04
-    container: swiftlang/swift:nightly-6.4.x-noble
     steps:
       - uses: actions/checkout@v6
-      - name: Install dependencies
-        run: apt-get update && apt-get install -y libssl-dev libsqlite3-dev
+      - name: Read the pinned toolchain
+        # `.swift-version` is the single source of truth — bump the file, not the workflow. Swiftly walks up
+        # from `working-directory` to find it, so the per-package jobs resolve the same toolchain.
+        run: echo "SWIFT_SNAPSHOT=$(cat .swift-version)" >> "$GITHUB_ENV"
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev libsqlite3-dev libcurl4-openssl-dev
+      - name: Install Swiftly + the pinned toolchain
+        run: |
+          curl -L "https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz" | tar zxf -
+          ./swiftly init --assume-yes --skip-install
+          echo "$HOME/.local/share/swiftly/bin" >> "$GITHUB_PATH"
+          # No `--use`: every command runs through `swiftly run`, which reads `.swift-version` itself.
+          # `--use` would rewrite that file (dropping its trailing newline) and dirty the tree, which the
+          # swift-format job's `git diff --exit-code` guard then fails on.
+          "$HOME/.local/share/swiftly/bin/swiftly" install "$SWIFT_SNAPSHOT" --assume-yes
       - name: Build
         working-directory: ${{ matrix.package }}
-        run: swift build
+        run: swiftly run swift build
 
   Integration:
-    name: End-to-end / ${{ matrix.example }} (Docker) / Swift 6.4 nightly
+    name: End-to-end / ${{ matrix.example }} (Docker) / Swift 6.4 (pinned)
     # Every runtime's integration test provisions a real datastore via swift-local-containers
     # (Hummingbird → Valkey, Vapor → MongoDB, SwiftHttpServerExample → CouchDB), so they need Docker —
     # native on the GitHub ubuntu runner, but unreachable from a container job. So this job installs the
-    # 6.4 nightly toolchain with Swiftly (rather than the container), keeping Docker native. The
+    # pinned 6.4 toolchain with Swiftly (rather than a container), keeping Docker native. The
     # snapshot is pinned here because .swift-version is gitignored (not in the checkout); when it's
     # garbage-collected upstream, bump it — the container jobs above already track latest.
     strategy:
       fail-fast: false
       matrix:
         example: [HummingbirdExample, VaporExample, SwiftHttpServerExample]
-    env:
-      SWIFT_SNAPSHOT: "6.4.x-snapshot-2026-07-06"
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+      - name: Read the pinned toolchain
+        # `.swift-version` is the single source of truth — bump the file, not the workflow.
+        run: echo "SWIFT_SNAPSHOT=$(cat .swift-version)" >> "$GITHUB_ENV"
       - name: Install system dependencies
         # libcurl4-openssl-dev is required by the toolchain itself (Foundation networking on Linux);
         # install it before Swiftly installs the toolchain, or Swiftly's post-install check fails.
         run: sudo apt-get update && sudo apt-get install -y libssl-dev libsqlite3-dev libcurl4-openssl-dev
-      - name: Install Swiftly + the Swift 6.4 nightly toolchain
+      - name: Install Swiftly + the pinned toolchain
         run: |
           curl -L "https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz" | tar zxf -
           ./swiftly init --assume-yes --skip-install
           echo "$HOME/.local/share/swiftly/bin" >> "$GITHUB_PATH"
-          "$HOME/.local/share/swiftly/bin/swiftly" install "$SWIFT_SNAPSHOT" --use --assume-yes
+          # No `--use`: every command below runs through `swiftly run`, which reads `.swift-version` itself.
+          # `--use` would *rewrite* that file (dropping its trailing newline) and dirty the tree, which
+          # the swift-format job's `git diff --exit-code` guard then fails on.
+          "$HOME/.local/share/swiftly/bin/swiftly" install "$SWIFT_SNAPSHOT" --assume-yes
       - name: Run integration test (real datastore via swift-local-containers)
         # Docker is preinstalled on the ubuntu runner; swift-local-containers pulls the image
         # (valkey/valkey:8 / mongo:7 / couchdb:3) and drives every route. Run via `swiftly run` (Swiftly
@@ -70,13 +86,27 @@ jobs:
       matrix:
         package: [Controllers, OpenAPISpec, HummingbirdExample, VaporExample, SwiftHttpServerExample]
     runs-on: ubuntu-24.04
-    container: swiftlang/swift:nightly-6.4.x-noble
     steps:
       - uses: actions/checkout@v6
+      - name: Read the pinned toolchain
+        # `.swift-version` is the single source of truth — bump the file, not the workflow. Swiftly walks up
+        # from `working-directory` to find it, so the per-package jobs resolve the same toolchain.
+        run: echo "SWIFT_SNAPSHOT=$(cat .swift-version)" >> "$GITHUB_ENV"
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev libsqlite3-dev libcurl4-openssl-dev
+      - name: Install Swiftly + the pinned toolchain
+        run: |
+          curl -L "https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz" | tar zxf -
+          ./swiftly init --assume-yes --skip-install
+          echo "$HOME/.local/share/swiftly/bin" >> "$GITHUB_PATH"
+          # No `--use`: every command runs through `swiftly run`, which reads `.swift-version` itself.
+          # `--use` would rewrite that file (dropping its trailing newline) and dirty the tree, which the
+          # swift-format job's `git diff --exit-code` guard then fails on.
+          "$HOME/.local/share/swiftly/bin/swiftly" install "$SWIFT_SNAPSHOT" --assume-yes
       - name: Run swift-format
         # From the 6.4 toolchain so it parses the proposal's ~Copyable / consuming sending syntax.
         working-directory: ${{ matrix.package }}
-        run: swift-format format --recursive --in-place .
+        run: swiftly run swift-format format --recursive --in-place .
       - name: Check for formatting differences
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
