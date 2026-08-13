@@ -285,6 +285,25 @@ struct TodoVerificationTests {
             )
             #expect(edited.status == .ok)
             #expect(String(buffer: edited.body).contains("replicas: 7"))
+
+            // A **streamed** request body through the adapter: `@MultipartBody` on WireMVC's streaming
+            // request tier, parsing an upload chunk by chunk. Note the adapter's `BridgeReader` wraps bytes
+            // it has already collected, so this streams the API and not the transport — the binding behaves
+            // identically, and the memory benefit is real only on the proposal-native runtime.
+            let upload = try await client.execute(
+                uri: "/upload",
+                method: .post,
+                headers: [.contentType: "multipart/form-data; boundary=B"],
+                body: ByteBuffer(
+                    string: "--B\r\nContent-Disposition: form-data; name=\"title\"\r\n\r\nWrite M5\r\n"
+                        + "--B\r\nContent-Disposition: form-data; name=\"f\"; filename=\"a.txt\"\r\n"
+                        + "Content-Type: text/plain\r\n\r\nalpha\r\n--B--\r\n"
+                )
+            )
+            #expect(upload.status == .ok)
+            let receipt = try decode(UploadReceipt.self, upload)
+            #expect(receipt.fields["title"] == "Write M5")
+            #expect(receipt.files.map(\.byteCount) == [5], "the file's bytes were counted, never held")
         }
     }
 }

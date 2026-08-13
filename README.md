@@ -82,6 +82,13 @@ The same goes for `OpenAPISpec`: one document, one `@OpenAPIController`, three r
   sentinel. A binding that fails to build maps exactly like a handler throw; gates are reserved for
   authorization. The token→session-id mapping lives in each runtime's own database behind a
   `SessionManager` binding, so the same token yields the same identity across requests.
+- **Multipart, both directions, neither in the framework.** `GET /export` streams `multipart/mixed` **out**
+  through a sender-transforming middleware (below); `POST /upload` reads `multipart/form-data` **in** through
+  `@MultipartBody`, a binding on WireMVC's *streaming request* tier. The upload is parsed a chunk at a time,
+  so the handler receives each file's name, size and checksum and never its bytes — peak memory is one chunk
+  plus the small fields, whatever the upload's size. The parser is the one piece of pure logic in
+  `Controllers` with its own unit suite, driven at **every chunk size**, because a boundary parser that is
+  correct on a whole buffer and wrong on a split is the bug that ships.
 - **A sender-transforming middleware.** `GET /export` streams a real `multipart/mixed` response: a
   route-scope middleware wraps the runtime's response sender in a `MultiPartSender<S>`, and the
   `@RawRoute(.responseSender)` handler receives that transformed type — which constraint inference
@@ -136,8 +143,8 @@ cd HummingbirdExample && swift run HummingbirdExample
 ```
 
 Route verification lives in each package's test target, which drives the full CRUD lifecycle — both
-authoring styles, `/me`, `/export`, `/contact`, `/config` and `/wiring` — against a throwaway backend
-container it provisions
+authoring styles, `/me`, `/export`, `/contact`, `/config`, `/upload` and `/wiring` — against a throwaway
+backend container it provisions
 via swift-local-containers. So `swift test` needs a container runtime (Docker); the suites skip
 themselves when none is available. Validated on macOS and Linux (see CI).
 
