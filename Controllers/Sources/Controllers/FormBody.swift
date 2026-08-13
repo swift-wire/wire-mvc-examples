@@ -1,11 +1,11 @@
+// Unconditional, deliberately. Elsewhere in this package a `#if canImport(FoundationEssentials)` guard is
+// fine because those files use only APIs present in both modules (`JSONEncoder`). `CharacterSet` and the
+// percent-encoding string APIs are full-Foundation only, so the same guard compiles on macOS and fails on
+// Linux. Percent-encoding is security-adjacent — over-decoding, double-decoding, malformed escapes — and is
+// exactly the work a standard library should be doing rather than this file.
+import Foundation
 public import HTTPTypes
 public import WireMVC
-
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 // `@FormBody` — an `application/x-www-form-urlencoded` request binding, declared **entirely outside
 // WireMVC**. Nothing in the framework names it.
@@ -63,7 +63,7 @@ extension FormBody: RequestBound where Value: FormDecodable {
         body: [UInt8]?
     ) async throws -> Value {
         guard let body else { throw FormBodyError.missingBody }
-        return try Value(formFields: parseFormFields(String(decoding: body, as: UTF8.self)))
+        return try Value(formFields: try parseFormFields(String(decoding: body, as: UTF8.self)))
     }
 }
 
@@ -89,19 +89,29 @@ extension FormBody: RequestBodySendable where Value: FormDecodable & FormEncodab
 ///
 /// Order and repetition are preserved: form encoding has no notion of a unique key, and collapsing to a
 /// dictionary here would silently drop every value but the last of a multi-select.
-public func parseFormFields(_ raw: String) -> [(name: String, value: String)] {
-    raw.split(separator: "&", omittingEmptySubsequences: true).compactMap { pair in
+public func parseFormFields(_ raw: String) throws -> [(name: String, value: String)] {
+    try raw.split(separator: "&", omittingEmptySubsequences: true).compactMap { pair in
         let halves = pair.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
-        guard let name = halves.first.map({ formUnescape(String($0)) }), !name.isEmpty else { return nil }
-        return (name, halves.count > 1 ? formUnescape(String(halves[1])) : "")
+        guard let first = halves.first else { return nil }
+        let name = try formUnescape(String(first))
+        guard !name.isEmpty else { return nil }
+        return (name, halves.count > 1 ? try formUnescape(String(halves[1])) : "")
     }
 }
 
-/// `+` is a space in form encoding — the one place it differs from ordinary percent-encoding, and the one
-/// most often got wrong.
-func formUnescape(_ raw: String) -> String {
+/// `+` is a space in form encoding — the one place it differs from ordinary percent-encoding.
+///
+/// **Throws** on a malformed escape rather than absorbing it. `removingPercentEncoding` returns `nil` for the
+/// *entire string* if any escape is bad, so the obvious `?? raw` means one stray `%` silently disables
+/// decoding for the whole value — `a%40b%zz` would come back with its `%40` still undecoded. Failing closed
+/// is the right posture for a decoder handling untrusted input, and the route already maps `FormBodyError`
+/// to a 400.
+func formUnescape(_ raw: String) throws -> String {
     let spaced = raw.replacingOccurrences(of: "+", with: " ")
-    return spaced.removingPercentEncoding ?? spaced
+    guard let decoded = spaced.removingPercentEncoding else {
+        throw FormBodyError.malformedEncoding(raw)
+    }
+    return decoded
 }
 
 func formEscape(_ raw: String) -> String {

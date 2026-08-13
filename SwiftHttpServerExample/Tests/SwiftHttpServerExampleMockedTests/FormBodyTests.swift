@@ -1,5 +1,5 @@
-import Foundation
 package import Controllers
+import Foundation
 import Testing
 import WireMVC
 import WireMVCTesting
@@ -13,8 +13,8 @@ import WireMVCTesting
 struct FormBodyCodecTests {
 
     @Test("plus is a space, percent escapes decode")
-    func decodesTheTwoEncodings() {
-        let fields = parseFormFields("display_name=Ada+Lovelace&email=ada%40example.com")
+    func decodesTheTwoEncodings() throws {
+        let fields = try parseFormFields("display_name=Ada+Lovelace&email=ada%40example.com")
         #expect(fields.map(\.name) == ["display_name", "email"])
         #expect(fields.map(\.value) == ["Ada Lovelace", "ada@example.com"])
     }
@@ -22,15 +22,15 @@ struct FormBodyCodecTests {
     /// Form encoding has no unique-key rule. Collapsing to a dictionary would keep only the last value of a
     /// multi-select — silently, and only for users who pick more than one option.
     @Test("repeated keys are kept, in order")
-    func repeatedKeysSurvive() {
-        let fields = parseFormFields("tags=swift&tags=server&tags=http")
+    func repeatedKeysSurvive() throws {
+        let fields = try parseFormFields("tags=swift&tags=server&tags=http")
         #expect(fields.count == 3)
         #expect(fields.map(\.value) == ["swift", "server", "http"])
     }
 
     @Test("an empty value is a present field, not an absent one")
-    func emptyValueIsPresent() {
-        let fields = parseFormFields("email=&display_name=Ada")
+    func emptyValueIsPresent() throws {
+        let fields = try parseFormFields("email=&display_name=Ada")
         #expect(fields.first?.name == "email")
         #expect(fields.first?.value == "")
     }
@@ -40,19 +40,41 @@ struct FormBodyCodecTests {
         let signup = Signup(email: "a&b=c+d@example.com", displayName: "Ada")
         var request = WireMVCOutgoingRequest()
         let encoded = try FormBody<Signup>.sendBody(
-            name: "form", value: signup, into: &request, coding: .default
+            name: "form",
+            value: signup,
+            into: &request,
+            coding: .default
         )
         #expect(encoded.contentType == "application/x-www-form-urlencoded")
         // Round-trips: the `&`, `=` and `+` inside the value survive as data rather than becoming structure.
-        let reparsed = try Signup(formFields: parseFormFields(String(decoding: encoded.bytes, as: UTF8.self)))
+        let reparsed = try Signup(formFields: try parseFormFields(String(decoding: encoded.bytes, as: UTF8.self)))
         #expect(reparsed.email == signup.email)
         #expect(reparsed.displayName == signup.displayName)
+    }
+
+    /// A malformed escape **fails closed**. `removingPercentEncoding` returns nil for the *entire string*
+    /// when any escape is bad, so the obvious `?? raw` would silently disable decoding for the whole value —
+    /// `a%40b%zz` coming back with its `%40` undecoded. Throwing makes it a 400 through the route's
+    /// `@ErrorResponse` instead of quietly handing the handler half-decoded input.
+    @Test("a malformed escape is rejected, not absorbed")
+    func malformedEscapeThrows() throws {
+        #expect(throws: FormBodyError.self) { try parseFormFields("note=50%+more") }
+        #expect(throws: FormBodyError.self) { try parseFormFields("note=%zz") }
+        // A *valid* escape of a percent sign is data, and still decodes.
+        let decoded = try parseFormFields("note=100%25+off")
+        #expect(decoded.first?.value == "100% off")
+    }
+
+    @Test("lower- and upper-case hex both decode")
+    func hexCaseInsensitive() throws {
+        #expect(try parseFormFields("a=%2f").first?.value == "/")
+        #expect(try parseFormFields("a=%2F").first?.value == "/")
     }
 
     @Test("a missing required field throws, so the route can map it")
     func missingFieldThrows() {
         #expect(throws: FormBodyError.self) {
-            try Signup(formFields: parseFormFields("email=ada%40example.com"))
+            try Signup(formFields: try parseFormFields("email=ada%40example.com"))
         }
     }
 }
