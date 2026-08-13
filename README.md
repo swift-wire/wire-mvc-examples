@@ -7,6 +7,7 @@ runtime that assembles the **same** controller source onto a different HTTP stac
 ```
 Controllers/            # framework-free @Controller types, proposal-native (WireMVC + Wire, Swift 6.4)
 HTMLForm/               # the html-form example: an Elementary view + a @FormBody round trip
+YAMLConfig/             # both ends of the extension point around one codec: @YAMLBody + @YAMLResponse
 OpenAPISpec/            # the same todos API, authored from an OpenAPI document (@OpenAPIController)
 HummingbirdExample/     # Hummingbird runtime (Swift 6.4) — proposal-native via WireMVCServerTransport, both
 VaporExample/           # Vapor runtime       (Swift 6.4) — proposal-native via WireMVCServerTransport, both
@@ -17,7 +18,7 @@ WireMVC's core is proposal-native (it dispatches over `swift-http-api-proposal`'
 raises a **Swift 6.4** floor). The runtimes reach it two ways: `SwiftHttpServerExample` serves the
 controllers *directly* on a proposal server, while `HummingbirdExample` and `VaporExample` serve the
 same proposal-native controllers on their framework's `Router` via the **`WireMVCServerTransport`**
-adapter (the wire-mvc `ServerTransport` trait, enabled in their manifests). All six packages are
+adapter (the wire-mvc `ServerTransport` trait, enabled in their manifests). All seven packages are
 Swift 6.4, against the one `Controllers` package.
 
 `OpenAPISpec` runs swift-openapi-generator with `accessModifier: public`, so its generated types cross
@@ -87,6 +88,12 @@ The same goes for `OpenAPISpec`: one document, one `@OpenAPIController`, three r
   cannot name, hence binding by *role*. Parts are written incrementally, one per todo, not buffered.
   Remove the middleware and the handler's parameter type becomes unsatisfiable, so the route is coupled
   to its transform at compile time.
+- **A response mode declared outside the framework.** `YAMLConfig` declares `@YAMLResponse` — a macro
+  carrying `@ResponseMode(.buffered, codec: "YAMLCodec")` — alongside `@YAMLBody`, so one package supplies
+  both halves of a route around one codec and WireMVC names neither. `PUT /config` is the round trip:
+  `YAMLBody<Settings>.sendBody` out, `YAMLCodec<Settings>.decodeResponseBody` back, in a single generated
+  client method. WireMVC's own `@JSONResponse` and `@HTMLResponse` are declared exactly this way, which is
+  the check that the seam is the right shape rather than a bolt-on.
 - **Both ends of the framework are extension points.** `@FormBody` (in `Controllers`) is an
   `application/x-www-form-urlencoded` request binding **declared outside WireMVC** — nothing in the
   framework names it. It is an attribute (`@RequestBinding(.body)`, which tells the *generator* to collect
@@ -129,8 +136,8 @@ cd HummingbirdExample && swift run HummingbirdExample
 ```
 
 Route verification lives in each package's test target, which drives the full CRUD lifecycle — both
-authoring styles, `/me`, `/export`, `/contact` and `/wiring` — against a throwaway backend container it
-provisions
+authoring styles, `/me`, `/export`, `/contact`, `/config` and `/wiring` — against a throwaway backend
+container it provisions
 via swift-local-containers. So `swift test` needs a container runtime (Docker); the suites skip
 themselves when none is available. Validated on macOS and Linux (see CI).
 
