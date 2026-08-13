@@ -29,6 +29,10 @@ let package = Package(
     dependencies: [
         .package(path: "../Controllers"),
         .package(path: "../OpenAPISpec"),
+        // The `html-form` example. A sibling package because it depends on Elementary and `Controllers`
+        // deliberately does not — same reason `OpenAPISpec` is one. Its `Elementary` trait request on wire-mvc
+        // unions with this runtime's `NIOHTTPServer` one, so both products resolve.
+        .package(path: "../HTMLForm"),
         // `NIOHTTPServer` switches on WireMVCTesting's `NIOHTTPServer: WireMVCTestServer` conformance and
         // the `.swiftHttpServer` suite mode. Off by default in wire-mvc, so a consumer that doesn't serve on
         // NIO resolves no server package at all — this runtime does, so it opts in.
@@ -61,6 +65,7 @@ let package = Package(
             name: "SwiftHttpServerExample",
             dependencies: [
                 .product(name: "Controllers", package: "Controllers"),
+                .product(name: "HTMLForm", package: "HTMLForm"),
                 .product(name: "OpenAPISpec", package: "OpenAPISpec"),
                 .product(name: "WireOpenAPI", package: "wire-open-api"),
                 .product(name: "WireMVC", package: "wire-mvc"),
@@ -114,6 +119,7 @@ let package = Package(
                 .product(name: "WireMVCMiddleware", package: "wire-mvc"),
                 .product(name: "WireMVCTesting", package: "wire-mvc"),
                 .product(name: "Controllers", package: "Controllers"),
+                .product(name: "HTMLForm", package: "HTMLForm"),
                 .product(name: "OpenAPISpec", package: "OpenAPISpec"),
                 .product(name: "WireOpenAPI", package: "wire-open-api"),
                 .product(name: "Wire", package: "swift-wire"),
@@ -156,6 +162,7 @@ let package = Package(
                 .product(name: "WireMVCMiddleware", package: "wire-mvc"),
                 .product(name: "WireMVCTesting", package: "wire-mvc"),
                 .product(name: "Controllers", package: "Controllers"),
+                .product(name: "HTMLForm", package: "HTMLForm"),
                 .product(name: "Wire", package: "swift-wire"),
                 // `TestingKey` + `@BindType`, split out of `Wire` so declaring a test-graph variant is a
                 // dependency a target takes deliberately. Only this suite declares one; the live suite next

@@ -1,5 +1,5 @@
 {
-  "originHash" : "f3c349c8919d30127f5abd95f3d3eecd3dd9ba1b59418962cf78bb17f0002af2",
+  "originHash" : "db463266d1d8087cdcccd9d2062fac48024673b4de5fa4f5f1c21da63d37a61e",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -15,8 +15,16 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/containerization.git",
       "state" : {
-        "revision" : "7800b4642171561c95b5f55500b19e5dce5acd45",
-        "version" : "0.40.1"
+        "revision" : "5427fd21ded4b84034126caef5b3182900b4776d",
+        "version" : "0.41.0"
+      }
+    },
+    {
+      "identity" : "elementary",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tachyonics/elementary.git",
+      "state" : {
+        "revision" : "07eb69492ddf7052616af47518e7f883bd8f2691"
       }
     },
     {
@@ -33,8 +41,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/grpc/grpc-swift-nio-transport.git",
       "state" : {
-        "revision" : "2ca31f06658ed288a2560e23ad649acbb3d6b3a3",
-        "version" : "2.9.0"
+        "revision" : "c46f77c07c3ae4fce4734e7af03fcb35ab544428",
+        "version" : "2.9.1"
       }
     },
     {
@@ -61,7 +69,7 @@
       "location" : "https://github.com/tachyonics/smockable",
       "state" : {
         "branch" : "main",
-        "revision" : "23c8c7cce2a63cd553dff4779b488f3cf726b5b2"
+        "revision" : "b5a13ed774970fbd56f7c4be7e7b5f9741fc45af"
       }
     },
     {
@@ -169,7 +177,7 @@
       "location" : "https://github.com/swift-server/swift-http-server.git",
       "state" : {
         "branch" : "main",
-        "revision" : "c2e1f5a4dfe1ce73fa7f6d6ab047081cdc2617c3"
+        "revision" : "5c6314bb63cd369b400b1b4a8bee40975411e965"
       }
     },
     {
@@ -204,8 +212,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-log.git",
       "state" : {
-        "revision" : "a878e7f8f46cfc0e1125e565b5c08e7d5272dc9a",
-        "version" : "1.14.0"
+        "revision" : "3ffafb9722d5d918c614feb496c8789a3b59d222",
+        "version" : "1.15.0"
       }
     },
     {
@@ -320,8 +328,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-system",
       "state" : {
-        "revision" : "50688cacbd41d547e9eb9f7a213542340b7c442b",
-        "version" : "1.7.5"
+        "revision" : "704705c5c51156ede21172a38654d522ce487074",
+        "version" : "1.8.0"
       }
     },
     {
@@ -330,7 +338,7 @@
       "location" : "https://github.com/tachyonics/swift-wire.git",
       "state" : {
         "branch" : "main",
-        "revision" : "049b23ead49a976784eda42e687fd4304a2b9004"
+        "revision" : "6b8478d70a17adab3d9c12183dfd40c6a26ca648"
       }
     },
     {
@@ -348,7 +356,7 @@
       "location" : "https://github.com/tachyonics/wire-open-api.git",
       "state" : {
         "branch" : "main",
-        "revision" : "907136ad387380669a9d3ffffa16fe15249b4d0c"
+        "revision" : "bb091b1ecb519b882c9e7ee38c4778961085ba07"
       }
     },
     {
