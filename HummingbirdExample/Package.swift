@@ -20,6 +20,11 @@ let package = Package(
     platforms: [.macOS(.v26)],
     dependencies: [
         .package(path: "../Controllers"),
+        // The `html-form` example. A sibling package because it depends on Elementary and `Controllers`
+        // deliberately does not; its `Elementary` trait request on wire-mvc unions with this runtime's
+        // `ServerTransport` one. Here it also demonstrates that a streamed `@HTMLResponse` reaches the
+        // client through the `WireMVCServerTransport` bridge, not only on a native proposal server.
+        .package(path: "../HTMLForm"),
         .package(path: "../OpenAPISpec"),
         .package(url: "https://github.com/tachyonics/wire-mvc.git", branch: "main", traits: ["ServerTransport"]),
         .package(url: "https://github.com/tachyonics/swift-wire.git", branch: "main"),
@@ -36,6 +41,7 @@ let package = Package(
             name: "HummingbirdExample",
             dependencies: [
                 .product(name: "Controllers", package: "Controllers"),
+                .product(name: "HTMLForm", package: "HTMLForm"),
                 .product(name: "OpenAPISpec", package: "OpenAPISpec"),
                 .product(name: "WireMVC", package: "wire-mvc"),
                 .product(name: "WireMVCServerTransport", package: "wire-mvc"),
@@ -71,6 +77,7 @@ let package = Package(
                 "HummingbirdExample",
                 .product(name: "HummingbirdTesting", package: "hummingbird"),
                 .product(name: "Controllers", package: "Controllers"),
+                .product(name: "HTMLForm", package: "HTMLForm"),
                 .product(name: "Wire", package: "swift-wire"),
                 .product(name: "ContainerMacrosLib", package: "swift-local-containers"),
                 .product(name: "ContainerTestSupport", package: "swift-local-containers"),

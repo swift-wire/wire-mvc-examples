@@ -6,6 +6,7 @@ runtime that assembles the **same** controller source onto a different HTTP stac
 
 ```
 Controllers/            # framework-free @Controller types, proposal-native (WireMVC + Wire, Swift 6.4)
+HTMLForm/               # the html-form example: an Elementary view + a @FormBody round trip
 OpenAPISpec/            # the same todos API, authored from an OpenAPI document (@OpenAPIController)
 HummingbirdExample/     # Hummingbird runtime (Swift 6.4) — proposal-native via WireMVCServerTransport, both
 VaporExample/           # Vapor runtime       (Swift 6.4) — proposal-native via WireMVCServerTransport, both
@@ -16,7 +17,7 @@ WireMVC's core is proposal-native (it dispatches over `swift-http-api-proposal`'
 raises a **Swift 6.4** floor). The runtimes reach it two ways: `SwiftHttpServerExample` serves the
 controllers *directly* on a proposal server, while `HummingbirdExample` and `VaporExample` serve the
 same proposal-native controllers on their framework's `Router` via the **`WireMVCServerTransport`**
-adapter (the wire-mvc `ServerTransport` trait, enabled in their manifests). All five packages are
+adapter (the wire-mvc `ServerTransport` trait, enabled in their manifests). All six packages are
 Swift 6.4, against the one `Controllers` package.
 
 `OpenAPISpec` runs swift-openapi-generator with `accessModifier: public`, so its generated types cross
@@ -86,6 +87,19 @@ The same goes for `OpenAPISpec`: one document, one `@OpenAPIController`, three r
   cannot name, hence binding by *role*. Parts are written incrementally, one per todo, not buffered.
   Remove the middleware and the handler's parameter type becomes unsatisfiable, so the route is coupled
   to its transform at compile time.
+- **Both ends of the framework are extension points.** `@FormBody` (in `Controllers`) is an
+  `application/x-www-form-urlencoded` request binding **declared outside WireMVC** — nothing in the
+  framework names it. It is an attribute (`@RequestBinding(.body)`, which tells the *generator* to collect
+  the body) plus two conformances: `RequestBound` decodes it on the server, `RequestBodySendable` encodes it
+  in the generated typed client. `@HTMLResponse` is the response half, streaming an Elementary document
+  rather than buffering it. `HTMLForm`'s `/contact` composes the two in one generated client method:
+  `submit(draft:) -> String` sends a form body and returns the rendered page.
+- **A form, re-rendered.** The `html-form` port (`GET /contact` renders, `POST /contact` validates and
+  re-renders with per-field errors and the user's input intact) lives in `HTMLForm`, a sibling package
+  rather than part of `Controllers` — for the same reason `OpenAPISpec` is one: it depends on a view
+  library, and `Controllers` is deliberately WireMVC + Wire and nothing else. All three runtimes serve it,
+  so a streamed HTML response is proven over `WireMVCServerTransport` and not only on a native
+  proposal server.
 - **Coexistence.** The ServerTransport runtimes also register a *native* route the framework's own
   way (`/health`), on the same router — WireMVC registers *onto* the app's transport, it doesn't own
   the router (collation, not registration).
@@ -115,7 +129,8 @@ cd HummingbirdExample && swift run HummingbirdExample
 ```
 
 Route verification lives in each package's test target, which drives the full CRUD lifecycle — both
-authoring styles, `/me`, `/export` and `/wiring` — against a throwaway backend container it provisions
+authoring styles, `/me`, `/export`, `/contact` and `/wiring` — against a throwaway backend container it
+provisions
 via swift-local-containers. So `swift test` needs a container runtime (Docker); the suites skip
 themselves when none is available. Validated on macOS and Linux (see CI).
 

@@ -251,6 +251,23 @@ struct TodoVerificationTests {
             )
             #expect(try decode(Me.self, aliceAgain).id == aliceMe.id)
             #expect(aliceMe.id != bobMe.id)
+
+            // The `html-form` example, through the adapter: `@FormBody` in, streamed `@HTMLResponse` out.
+            // Both halves are declared outside WireMVC, and neither the binding nor the streaming response
+            // is native to this runtime — they arrive over `WireMVCServerTransport` like every other route.
+            let blankForm = try await client.execute(uri: "/contact", method: .get)
+            #expect(blankForm.status == .ok)
+            #expect(blankForm.headers[.contentType] == "text/html; charset=utf-8")
+            #expect(String(buffer: blankForm.body).contains(#"<form method="post" action="/contact""#))
+
+            let submitted = try await client.execute(
+                uri: "/contact",
+                method: .post,
+                headers: [.contentType: "application/x-www-form-urlencoded"],
+                body: ByteBuffer(string: "name=Ada+Lovelace&email=ada%40example.com&message=Please+send+documentation.")
+            )
+            #expect(submitted.status == .ok)
+            #expect(String(buffer: submitted.body).contains("Thanks, Ada Lovelace — we will reply to ada@example.com."))
         }
     }
 }

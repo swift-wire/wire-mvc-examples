@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [Controllers, OpenAPISpec, HummingbirdExample, VaporExample, SwiftHttpServerExample]
+        package: [Controllers, HTMLForm, OpenAPISpec, HummingbirdExample, VaporExample, SwiftHttpServerExample]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -46,9 +46,8 @@ jobs:
     # Every runtime's integration test provisions a real datastore via swift-local-containers
     # (Hummingbird → Valkey, Vapor → MongoDB, SwiftHttpServerExample → CouchDB), so they need Docker —
     # native on the GitHub ubuntu runner, but unreachable from a container job. So this job installs the
-    # pinned 6.4 toolchain with Swiftly (rather than a container), keeping Docker native. The
-    # snapshot is pinned here because .swift-version is gitignored (not in the checkout); when it's
-    # garbage-collected upstream, bump it — the container jobs above already track latest.
+    # pinned 6.4 toolchain with Swiftly (rather than a container), keeping Docker native — reading the
+    # snapshot from `.swift-version` like every other job.
     strategy:
       fail-fast: false
       matrix:
@@ -84,7 +83,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [Controllers, OpenAPISpec, HummingbirdExample, VaporExample, SwiftHttpServerExample]
+        package: [Controllers, HTMLForm, OpenAPISpec, HummingbirdExample, VaporExample, SwiftHttpServerExample]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -119,7 +118,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [Controllers, OpenAPISpec, HummingbirdExample, VaporExample, SwiftHttpServerExample]
+        package: [Controllers, HTMLForm, OpenAPISpec, HummingbirdExample, VaporExample, SwiftHttpServerExample]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
