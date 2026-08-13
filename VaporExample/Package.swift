@@ -25,6 +25,10 @@ let package = Package(
         // `ServerTransport` one. Here it also demonstrates that a streamed `@HTMLResponse` reaches the
         // client through the `WireMVCServerTransport` bridge, not only on a native proposal server.
         .package(path: "../HTMLForm"),
+        // Both ends of the extension point around one codec: `@YAMLBody` in, `@YAMLResponse` out. Here it
+        // also shows a *buffered* user mode reaching the client through `WireMVCServerTransport`, where
+        // `HTMLForm` covers the streaming one.
+        .package(path: "../YAMLConfig"),
         .package(path: "../OpenAPISpec"),
         .package(url: "https://github.com/tachyonics/wire-mvc.git", branch: "main", traits: ["ServerTransport"]),
         .package(url: "https://github.com/tachyonics/swift-wire.git", branch: "main"),
@@ -42,6 +46,7 @@ let package = Package(
             dependencies: [
                 .product(name: "Controllers", package: "Controllers"),
                 .product(name: "HTMLForm", package: "HTMLForm"),
+                .product(name: "YAMLConfig", package: "YAMLConfig"),
                 .product(name: "OpenAPISpec", package: "OpenAPISpec"),
                 .product(name: "WireMVC", package: "wire-mvc"),
                 .product(name: "WireMVCServerTransport", package: "wire-mvc"),
@@ -74,6 +79,7 @@ let package = Package(
                 .product(name: "VaporTesting", package: "vapor"),
                 .product(name: "Controllers", package: "Controllers"),
                 .product(name: "HTMLForm", package: "HTMLForm"),
+                .product(name: "YAMLConfig", package: "YAMLConfig"),
                 .product(name: "Wire", package: "swift-wire"),
                 .product(name: "ContainerMacrosLib", package: "swift-local-containers"),
                 .product(name: "ContainerTestSupport", package: "swift-local-containers"),

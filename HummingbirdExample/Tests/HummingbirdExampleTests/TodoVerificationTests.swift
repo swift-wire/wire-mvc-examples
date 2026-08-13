@@ -268,6 +268,23 @@ struct TodoVerificationTests {
             )
             #expect(submitted.status == .ok)
             #expect(String(buffer: submitted.body).contains("Thanks, Ada Lovelace — we will reply to ada@example.com."))
+
+            // A *user-declared response mode* through the adapter: `@YAMLResponse` in `YAMLConfig`, with
+            // `@YAMLBody` on the way in. `HTMLForm` above covers the streaming terminal; this is the
+            // buffered one, and neither annotation is WireMVC's.
+            let config = try await client.execute(uri: "/config", method: .get)
+            #expect(config.status == .ok)
+            #expect(config.headers[.contentType] == "application/yaml")
+            #expect(String(buffer: config.body).contains("serviceName: todos"))
+
+            let edited = try await client.execute(
+                uri: "/config",
+                method: .put,
+                headers: [.contentType: "application/yaml"],
+                body: ByteBuffer(string: "serviceName: todos\nreplicas: 7\nfeatures: [metrics]\n")
+            )
+            #expect(edited.status == .ok)
+            #expect(String(buffer: edited.body).contains("replicas: 7"))
         }
     }
 }

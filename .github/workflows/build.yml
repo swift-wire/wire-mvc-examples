@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [Controllers, HTMLForm, OpenAPISpec, HummingbirdExample, VaporExample, SwiftHttpServerExample]
+        package: [Controllers, HTMLForm, YAMLConfig, OpenAPISpec, HummingbirdExample, VaporExample, SwiftHttpServerExample]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -83,7 +83,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [Controllers, HTMLForm, OpenAPISpec, HummingbirdExample, VaporExample, SwiftHttpServerExample]
+        package: [Controllers, HTMLForm, YAMLConfig, OpenAPISpec, HummingbirdExample, VaporExample, SwiftHttpServerExample]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -118,7 +118,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [Controllers, HTMLForm, OpenAPISpec, HummingbirdExample, VaporExample, SwiftHttpServerExample]
+        package: [Controllers, HTMLForm, YAMLConfig, OpenAPISpec, HummingbirdExample, VaporExample, SwiftHttpServerExample]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6

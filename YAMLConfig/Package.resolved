@@ -1,5 +1,5 @@
 {
-  "originHash" : "db463266d1d8087cdcccd9d2062fac48024673b4de5fa4f5f1c21da63d37a61e",
+  "originHash" : "0102eeb32e84adff9cf10a5120d8ebafd48181988a2a3318d5b371a3691b5c94",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -11,83 +11,12 @@
       }
     },
     {
-      "identity" : "containerization",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/containerization.git",
-      "state" : {
-        "revision" : "5427fd21ded4b84034126caef5b3182900b4776d",
-        "version" : "0.41.0"
-      }
-    },
-    {
-      "identity" : "elementary",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tachyonics/elementary.git",
-      "state" : {
-        "revision" : "07eb69492ddf7052616af47518e7f883bd8f2691"
-      }
-    },
-    {
-      "identity" : "grpc-swift-2",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/grpc/grpc-swift-2.git",
-      "state" : {
-        "revision" : "28cdd63ef88583ddc67d7bb179eab46fab465ce9",
-        "version" : "2.4.2"
-      }
-    },
-    {
-      "identity" : "grpc-swift-nio-transport",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/grpc/grpc-swift-nio-transport.git",
-      "state" : {
-        "revision" : "c46f77c07c3ae4fce4734e7af03fcb35ab544428",
-        "version" : "2.9.1"
-      }
-    },
-    {
-      "identity" : "grpc-swift-protobuf",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/grpc/grpc-swift-protobuf.git",
-      "state" : {
-        "revision" : "176c5a434fd76f6f479848d1a8f7d44967534168",
-        "version" : "2.4.1"
-      }
-    },
-    {
-      "identity" : "openapikit",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/mattpolzin/OpenAPIKit",
-      "state" : {
-        "revision" : "57b6318128e3f901c93f4fbf98d1c1464ec168d3",
-        "version" : "6.2.0"
-      }
-    },
-    {
-      "identity" : "smockable",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tachyonics/smockable",
-      "state" : {
-        "branch" : "main",
-        "revision" : "b5a13ed774970fbd56f7c4be7e7b5f9741fc45af"
-      }
-    },
-    {
       "identity" : "swift-algorithms",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-algorithms.git",
       "state" : {
         "revision" : "87e50f483c54e6efd60e885f7f5aa946cee68023",
         "version" : "1.2.1"
-      }
-    },
-    {
-      "identity" : "swift-argument-parser",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-argument-parser.git",
-      "state" : {
-        "revision" : "6a52f3251125d74daf04fcbd5e6f08a75d074382",
-        "version" : "1.8.2"
       }
     },
     {
@@ -149,8 +78,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto.git",
       "state" : {
-        "revision" : "95ba0316a9b733e92bb6b071255ff46263bbe7dc",
-        "version" : "3.15.1"
+        "revision" : "47d3869a7291f085c1fb9fb1e6d3b97a793f45c6",
+        "version" : "4.5.1"
       }
     },
     {
@@ -172,15 +101,6 @@
       }
     },
     {
-      "identity" : "swift-http-server",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/swift-server/swift-http-server.git",
-      "state" : {
-        "branch" : "main",
-        "revision" : "5c6314bb63cd369b400b1b4a8bee40975411e965"
-      }
-    },
-    {
       "identity" : "swift-http-structured-headers",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-http-structured-headers.git",
@@ -196,15 +116,6 @@
       "state" : {
         "revision" : "db774a277f60063a32d854f2980299caf06da041",
         "version" : "1.6.0"
-      }
-    },
-    {
-      "identity" : "swift-local-containers",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tachyonics/swift-local-containers.git",
-      "state" : {
-        "revision" : "6930c779c176ec69c9079df9186025ac17c016b0",
-        "version" : "0.10.0"
       }
     },
     {
@@ -271,32 +182,6 @@
       }
     },
     {
-      "identity" : "swift-openapi-generator",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tachyonics/swift-openapi-generator.git",
-      "state" : {
-        "revision" : "9e655e0adb9b993ef4cb29a6aa0dfc59b9b42b09"
-      }
-    },
-    {
-      "identity" : "swift-openapi-runtime",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-openapi-runtime.git",
-      "state" : {
-        "revision" : "3d3a8457661daf7fb260ceeb9f0e24e5204ba5fb",
-        "version" : "1.12.0"
-      }
-    },
-    {
-      "identity" : "swift-protobuf",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-protobuf.git",
-      "state" : {
-        "revision" : "55d7a1cc5666b85c13464aea1c4b4a90feccb4c8",
-        "version" : "1.38.1"
-      }
-    },
-    {
       "identity" : "swift-service-context",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-service-context.git",
@@ -351,30 +236,12 @@
       }
     },
     {
-      "identity" : "wire-open-api",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tachyonics/wire-open-api.git",
-      "state" : {
-        "branch" : "main",
-        "revision" : "bb091b1ecb519b882c9e7ee38c4778961085ba07"
-      }
-    },
-    {
       "identity" : "yams",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/jpsim/Yams",
+      "location" : "https://github.com/jpsim/Yams.git",
       "state" : {
         "revision" : "a27b21e0c81c5bf42049b897a62aaf387e80f279",
         "version" : "6.2.2"
-      }
-    },
-    {
-      "identity" : "zstd",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/facebook/zstd.git",
-      "state" : {
-        "revision" : "f8745da6ff1ad1e7bab384bd1f9d742439278e99",
-        "version" : "1.5.7"
       }
     }
   ],
