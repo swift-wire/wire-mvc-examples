@@ -1,3 +1,14 @@
+// Unconditional, and deliberately not behind `#if canImport(FoundationEssentials)` — the same call
+// `FormBody` makes two files over, for the same reason. `trimmingCharacters(in:)` and `CharacterSet` are
+// **full**-Foundation, and that guard is asymmetric: false on macOS, so the whole module is imported and
+// everything resolves; true on Linux, so it is not. A file using a full-Foundation API under it compiles
+// locally and fails only in CI, which is how this file first went wrong.
+//
+// The standard library has `trimmingPrefix(while:)` but no both-ends equivalent, so trimming a token is
+// Foundation's work. Writing one here would be reimplementing library code — the same mistake as
+// hand-rolling percent-encoding, which was made and reverted in `FormBody`.
+import Foundation
+
 // An incremental `multipart/form-data` parser (RFC 7578, framing per RFC 2046 §5.1).
 //
 // Incremental because that is the whole point: it is fed one chunk at a time off the request body reader and
@@ -175,14 +186,17 @@ public struct MultipartParser {
             .compactMap { line in
                 guard let colon = line.firstIndex(of: ":") else { return nil }
                 let name = String(line[line.startIndex..<colon])
-                let value = String(line[line.index(after: colon)...]).trimmingLeadingSpaces()
+                let value = String(line[line.index(after: colon)...])
+                    .trimmingCharacters(in: httpWhitespace)
                 return (name, value)
             }
     }
 }
 
-extension String {
-    fileprivate func trimmingLeadingSpaces() -> String {
-        String(drop { $0 == " " || $0 == "\t" })
-    }
-}
+/// RFC 9110's `OWS` — space and horizontal tab, and nothing else. Deliberately not `.whitespaces`, which
+/// includes Unicode spaces an HTTP header field cannot contain: being exact is the point when the value
+/// being trimmed is a boundary delimiter that framing depends on.
+let httpWhitespace = CharacterSet(charactersIn: " \t")
+
+/// The same, plus the quotes around a quoted parameter value (`filename="a.txt"`).
+let httpWhitespaceAndQuotes = CharacterSet(charactersIn: " \t\"")

@@ -1,4 +1,6 @@
 public import AsyncStreaming
+// Unconditional — see the note atop `MultipartParser.swift`.
+import Foundation
 public import HTTPTypes
 public import WireMVC
 
@@ -257,10 +259,10 @@ func multipartBoundary(from contentType: String?) -> String? {
     guard let contentType, contentType.lowercased().hasPrefix("multipart/") else { return nil }
     for parameter in contentType.split(separator: ";").dropFirst() {
         let pair = parameter.split(separator: "=", maxSplits: 1)
-        guard pair.count == 2, pair[0].trimmingCharacters(in: [" ", "\t"]).lowercased() == "boundary" else {
+        guard pair.count == 2, pair[0].trimmingCharacters(in: httpWhitespace).lowercased() == "boundary" else {
             continue
         }
-        let value = pair[1].trimmingCharacters(in: [" ", "\t", "\""])
+        let value = pair[1].trimmingCharacters(in: httpWhitespaceAndQuotes)
         return value.isEmpty ? nil : value
     }
     return nil
@@ -270,16 +272,10 @@ func multipartBoundary(from contentType: String?) -> String? {
 private func dispositionParameter(_ wanted: String, in disposition: String) -> String? {
     for parameter in disposition.split(separator: ";").dropFirst() {
         let pair = parameter.split(separator: "=", maxSplits: 1)
-        guard pair.count == 2, pair[0].trimmingCharacters(in: [" ", "\t"]).lowercased() == wanted else {
+        guard pair.count == 2, pair[0].trimmingCharacters(in: httpWhitespace).lowercased() == wanted else {
             continue
         }
-        return pair[1].trimmingCharacters(in: [" ", "\t", "\""])
+        return pair[1].trimmingCharacters(in: httpWhitespaceAndQuotes)
     }
     return nil
 }
-
-#if canImport(FoundationEssentials)
-private import FoundationEssentials
-#else
-private import Foundation
-#endif
