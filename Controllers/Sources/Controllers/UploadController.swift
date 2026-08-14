@@ -6,8 +6,7 @@ public import WireMVC
 // `POST /upload` binds `@MultipartSummary` (WireMVC's `.readerBody` tier); `POST /upload/stream` binds
 // `@MultipartStream` (the `.bodyStream` tier). Both are declared in this module rather than in WireMVC,
 // both drive the same `MultipartParser`, and **neither ever holds the upload** — peak memory is one chunk
-// plus the small fields either way. The difference is not memory. That is the obvious guess and the wrong
-// one, which is the reason this comment exists.
+// plus the small fields either way. The difference is not memory.
 //
 // The difference is *when the handler can act*, and so whether the bytes are read at all.
 // `@MultipartSummary` runs the parse to completion and hands back a finished `MultipartForm`: every byte is
