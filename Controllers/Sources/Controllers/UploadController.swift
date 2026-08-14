@@ -1,17 +1,28 @@
 public import Wire
 public import WireMVC
 
-// An upload route bound with `@MultipartBody` — the streaming request tier, in a binding declared in this
-// module rather than in WireMVC.
+// Two upload routes, and the one thing that separates them.
 //
-// The route is deliberately dull: it echoes what the binding parsed. The interesting property is not in the
-// handler, it is in what the handler *never sees* — the file bytes. They passed through the binding a chunk
-// at a time and were folded into a size and a checksum; a 2 GB upload leaves this method holding a few
-// hundred bytes of summary.
+// `POST /upload` binds `@MultipartSummary` (WireMVC's `.readerBody` tier); `POST /upload/stream` binds
+// `@MultipartStream` (the `.bodyStream` tier). Both are declared in this module rather than in WireMVC,
+// both drive the same `MultipartParser`, and **neither ever holds the upload** — peak memory is one chunk
+// plus the small fields either way. The difference is not memory. That is the obvious guess and the wrong
+// one, which is the reason this comment exists.
+//
+// The difference is *when the handler can act*, and so whether the bytes are read at all.
+// `@MultipartSummary` runs the parse to completion and hands back a finished `MultipartForm`: every byte is
+// read and folded into a size and a checksum, none is retained, and the handler starts after the last one.
+// A 2 GB upload leaves this method holding a few hundred bytes of summary — but the client still sent 2 GB.
+// `@MultipartStream` lends the parts as they arrive, so the handler can decide on the first field and never
+// read the file: `@ErrorResponse` turns that into a 401 while the upload is still in flight, and the server
+// answers with `Connection: close` rather than draining it.
+//
+// So: the summary when the answer needs the whole form, the stream when the answer might be *no*. Both
+// routes are otherwise deliberately dull — they echo what the binding produced.
 //
 // It also completes the pair with `MultiPartExport`: `GET /export` streams `multipart/mixed` **out** through
-// a sender-transforming middleware, and this reads `multipart/form-data` **in** through a streaming binding.
-// Neither direction required a change to WireMVC.
+// a sender-transforming middleware, and these read `multipart/form-data` **in**. Neither direction required
+// a change to WireMVC.
 
 public struct UploadRejected: Error, Equatable {
     public let reason: String
@@ -55,8 +66,8 @@ public struct UploadController: Sendable {
     /// client has finished sending it — the concrete thing streaming buys over collecting.
     @Post
     @JSONResponse
-    @ErrorResponse(MultipartBodyError.self, .badRequest)
-    public func receive(@MultipartBody form: MultipartForm) -> UploadReceipt {
+    @ErrorResponse(MultipartBindingError.self, .badRequest)
+    public func receive(@MultipartSummary form: MultipartForm) -> UploadReceipt {
         UploadReceipt(
             fields: Dictionary(form.fields, uniquingKeysWith: { _, last in last }),
             files: form.files
@@ -94,7 +105,7 @@ public struct UploadController: Sendable {
     @Post("/stream")
     @JSONResponse
     @ErrorResponse(UploadRejected.self, .unauthorized)
-    @ErrorResponse(MultipartBodyError.self, .badRequest)
+    @ErrorResponse(MultipartBindingError.self, .badRequest)
     public func receiveStream<Stream: MultipartPartStream & ~Copyable>(
         @MultipartStream stream: consuming Stream
     ) async throws -> StreamedUploadReceipt {

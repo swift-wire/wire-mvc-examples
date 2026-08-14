@@ -177,7 +177,7 @@
       "location" : "https://github.com/swift-server/swift-http-server.git",
       "state" : {
         "branch" : "main",
-        "revision" : "5c6314bb63cd369b400b1b4a8bee40975411e965"
+        "revision" : "15fb0327a17547d8eb736da77a6b1bd899a53110"
       }
     },
     {
@@ -328,8 +328,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-system",
       "state" : {
-        "revision" : "704705c5c51156ede21172a38654d522ce487074",
-        "version" : "1.8.0"
+        "revision" : "869129b7bf4ecc57b97d0193ad29690ca2134750",
+        "version" : "1.8.1"
       }
     },
     {
@@ -338,7 +338,7 @@
       "location" : "https://github.com/tachyonics/swift-wire.git",
       "state" : {
         "branch" : "main",
-        "revision" : "6b8478d70a17adab3d9c12183dfd40c6a26ca648"
+        "revision" : "2651be872ffd63dbf3f9deb3d13771223fefd821"
       }
     },
     {
@@ -347,7 +347,7 @@
       "location" : "https://github.com/tachyonics/wire-mvc.git",
       "state" : {
         "branch" : "main",
-        "revision" : "bcbc4e4ea19e33f3a443d6a704694f0d3b1d8627"
+        "revision" : "3f1829fbf79f6bc0dc719135877713205598095b"
       }
     },
     {

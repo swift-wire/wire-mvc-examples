@@ -84,13 +84,16 @@ The same goes for `OpenAPISpec`: one document, one `@OpenAPIController`, three r
   `SessionManager` binding, so the same token yields the same identity across requests.
 - **Multipart, both directions, neither in the framework.** `GET /export` streams `multipart/mixed` **out**
   through a sender-transforming middleware (below); `POST /upload` reads `multipart/form-data` **in** through
-  `@MultipartBody`, a binding on WireMVC's *streaming request* tier. The upload is parsed a chunk at a time,
+  `@MultipartSummary`, a binding on WireMVC's `.readerBody` tier. The upload is parsed a chunk at a time,
   so the handler receives each file's name, size and checksum and never its bytes — peak memory is one chunk
-  plus the small fields, whatever the upload's size. The parser is the one piece of pure logic in
+  plus the small fields, whatever the upload's size. It is named for what it hands back rather than what it
+  reads: it reads every byte and retains none. The parser is the one piece of pure logic in
   `Controllers` with its own unit suite, driven at **every chunk size**, because a boundary parser that is
   correct on a whole buffer and wrong on a split is the bug that ships.
 - **Acting on a body before it has arrived.** `POST /upload/stream` uses the same parser through
-  `@MultipartStream`, which *lends* the handler the parts rather than handing back a finished value. The
+  `@MultipartStream`, on the `.bodyStream` tier. **The difference from `@MultipartSummary` is not memory** —
+  both are flat — it is *when the handler can act*, and so whether the bytes are read at all. It
+  *lends* the handler the parts rather than handing back a finished value. The
   handler pulls, decides on the first field, and — when the answer is no — **never reads the file**:
   `@ErrorResponse` turns that into a 401 while hundreds of kilobytes are still in flight, and the server
   answers with `Connection: close` rather than draining them. No collecting binding can express that at any

@@ -3,11 +3,16 @@ public import BasicContainers
 public import HTTPTypes
 public import WireMVC
 
-// `@MultipartStream` — the same parser as `@MultipartBody`, lent to the handler instead of run to completion.
+// `@MultipartStream` — the same parser as `@MultipartSummary`, lent to the handler instead of run to
+// completion. WireMVC's `.bodyStream` tier, against the sibling's `.readerBody`.
 //
-// `@MultipartBody` streams the *parse* and hands back a finished `MultipartForm`: memory stays flat, but the
-// handler cannot act until the last byte has arrived. This one gives the handler the parts as they arrive,
-// so it can reject an upload after its first field and **never read the file at all**.
+// **Not a memory optimisation.** `@MultipartSummary` is already flat — it folds each file into a size and a
+// checksum and retains nothing. What it cannot do is stop: the parse runs to the last byte before the
+// handler sees anything, so a request that was going to be rejected is read in full first.
+//
+// This one hands the handler the parts as they arrive, so it can reject after the first field and **never
+// read the file at all** — the difference is decision latency, not peak memory. `UploadController.swift`
+// sets the two routes side by side.
 //
 // Both drive `MultipartParser`, which is why it was written as a value fed chunks rather than a function
 // over a body.
@@ -68,7 +73,7 @@ where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields? {
         _ body: (inout MultipartCursor<Reader>) async throws -> T
     ) async throws -> T {
         guard let boundary else {
-            throw MultipartBodyError.notMultipart(contentType: nil)
+            throw MultipartBindingError.notMultipart(contentType: nil)
         }
         var cursor = MultipartCursor(reader: reader, boundary: boundary)
         return try await body(&cursor)
@@ -141,7 +146,7 @@ where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields? {
         var bytes: [UInt8] = []
         while let chunk = try await nextChunk() {
             bytes.append(contentsOf: chunk)
-            guard bytes.count <= maximum else { throw MultipartBodyError.fieldTooLarge(name: "") }
+            guard bytes.count <= maximum else { throw MultipartBindingError.fieldTooLarge(name: "") }
         }
         return bytes
     }
@@ -154,14 +159,14 @@ where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields? {
     ///
     /// Every `MultipartError` the parser raises — a malformed delimiter, oversized headers, a body that
     /// stopped mid-part — is translated into this binding's own vocabulary before it leaves. A route maps
-    /// failures with `@ErrorResponse(MultipartBodyError.self, …)` and can only name a type it can see, so
+    /// failures with `@ErrorResponse(MultipartBindingError.self, …)` and can only name a type it can see, so
     /// letting the parser's type escape makes every parse failure an unmapped 500. That is exactly what it
     /// did until a truncated body came back 500 instead of 400.
     private mutating func pump() async throws -> Bool {
         do {
             return try await pumpUnwrapped()
         } catch let error as MultipartError {
-            throw MultipartBodyError.malformed(error)
+            throw MultipartBindingError.malformed(error)
         }
     }
 
