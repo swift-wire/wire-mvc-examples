@@ -304,6 +304,36 @@ struct TodoVerificationTests {
             let receipt = try decode(UploadReceipt.self, upload)
             #expect(receipt.fields["title"] == "Write M5")
             #expect(receipt.files.map(\.byteCount) == [5], "the file's bytes were counted, never held")
+
+            // The **lent** stream, through the adapter: the handler pulls parts as they arrive and rejects
+            // on the first field, so the file after it is never read. Note the adapter's `BridgeReader`
+            // wraps bytes it has already collected, so what this proves here is the binding and the wiring
+            // — the memory saving is real only on the proposal-native runtime.
+            let abandoned = try await client.execute(
+                uri: "/upload/stream",
+                method: .post,
+                headers: [.contentType: "multipart/form-data; boundary=B"],
+                body: ByteBuffer(
+                    string: "--B\r\nContent-Disposition: form-data; name=\"token\"\r\n\r\nwrong\r\n"
+                        + "--B\r\nContent-Disposition: form-data; name=\"f\"; filename=\"big.bin\"\r\n"
+                        + "Content-Type: application/octet-stream\r\n\r\n"
+                        + String(repeating: "x", count: 4096) + "\r\n--B--\r\n"
+                )
+            )
+            #expect(abandoned.status == .unauthorized, "decided on the first field, before the file")
+
+            let accepted = try await client.execute(
+                uri: "/upload/stream",
+                method: .post,
+                headers: [.contentType: "multipart/form-data; boundary=B"],
+                body: ByteBuffer(
+                    string: "--B\r\nContent-Disposition: form-data; name=\"token\"\r\n\r\nletmein\r\n"
+                        + "--B\r\nContent-Disposition: form-data; name=\"f\"; filename=\"a.bin\"\r\n"
+                        + "Content-Type: application/octet-stream\r\n\r\nalpha\r\n--B--\r\n"
+                )
+            )
+            #expect(accepted.status == .ok)
+            #expect(try decode(StreamedUploadReceipt.self, accepted).read == ["a.bin": 5])
         }
     }
 }

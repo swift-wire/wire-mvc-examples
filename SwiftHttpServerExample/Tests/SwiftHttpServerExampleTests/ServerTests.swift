@@ -121,6 +121,32 @@ struct TodosRoutingTests {
             #expect(events.contains("data: \(created.id)\n\n") && events.contains("data: \(created2.id)\n\n"))
             #expect(events.components(separatedBy: "\n\n").filter { !$0.isEmpty }.count == 2)
 
+            // ---- Abandoning an upload mid-body, over a real connection ----
+            //
+            // The mocked suite already pins the 401. What only a live transport shows is what happens to the
+            // connection: the handler rejects on the first field and never reads the file, so the response
+            // is written before the request `.end` arrives. `HTTPKeepAliveHandler` sees that and amends the
+            // head with `Connection: close` rather than draining an unbounded upload — which is why an early
+            // exit is a well-formed HTTP interaction and not a hung socket.
+            let boundary = "----WireMVCLive"
+            var abandoned = "--\(boundary)\r\nContent-Disposition: form-data; name=\"token\"\r\n\r\nwrong\r\n"
+            abandoned += "--\(boundary)\r\nContent-Disposition: form-data; name=\"blob\"; filename=\"big.bin\"\r\n"
+            abandoned += "Content-Type: application/octet-stream\r\n\r\n"
+            abandoned += String(repeating: "x", count: 512 * 1024)
+            abandoned += "\r\n--\(boundary)--\r\n"
+
+            let abandonedUpload = try await client.send(
+                "POST",
+                "/upload/stream",
+                body: Data(abandoned.utf8),
+                headers: ["Content-Type": "multipart/form-data; boundary=\(boundary)"]
+            )
+            #expect(abandonedUpload.status == 401, "rejected on the first field, before the file was read")
+            #expect(
+                abandonedUpload.head?.headerFields[.connection]?.lowercased() == "close",
+                "the server closes rather than draining a body the handler abandoned"
+            )
+
             // ---- The OpenAPI half, on the same router and the same backend ----
             //
             // Everything above reached `/todos` through `@Get`/`@Post`. These reach `/api/todos` through an

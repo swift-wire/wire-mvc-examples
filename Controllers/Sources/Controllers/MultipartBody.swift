@@ -269,7 +269,7 @@ func multipartBoundary(from contentType: String?) -> String? {
 }
 
 /// `form-data; name="file"; filename="a.txt"` → the named parameter's value.
-private func dispositionParameter(_ wanted: String, in disposition: String) -> String? {
+func dispositionParameter(_ wanted: String, in disposition: String) -> String? {
     for parameter in disposition.split(separator: ";").dropFirst() {
         let pair = parameter.split(separator: "=", maxSplits: 1)
         guard pair.count == 2, pair[0].trimmingCharacters(in: httpWhitespace).lowercased() == wanted else {

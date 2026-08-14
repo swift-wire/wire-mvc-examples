@@ -89,6 +89,14 @@ The same goes for `OpenAPISpec`: one document, one `@OpenAPIController`, three r
   plus the small fields, whatever the upload's size. The parser is the one piece of pure logic in
   `Controllers` with its own unit suite, driven at **every chunk size**, because a boundary parser that is
   correct on a whole buffer and wrong on a split is the bug that ships.
+- **Acting on a body before it has arrived.** `POST /upload/stream` uses the same parser through
+  `@MultipartStream`, which *lends* the handler the parts rather than handing back a finished value. The
+  handler pulls, decides on the first field, and — when the answer is no — **never reads the file**:
+  `@ErrorResponse` turns that into a 401 while hundreds of kilobytes are still in flight, and the server
+  answers with `Connection: close` rather than draining them. No collecting binding can express that at any
+  price. The cursor it pulls on is `~Copyable, ~Escapable`, so keeping it past the request is a compile
+  error rather than a rule in a comment; the handler signature carries two live compiler limitations, named
+  at the route with issue numbers.
 - **A sender-transforming middleware.** `GET /export` streams a real `multipart/mixed` response: a
   route-scope middleware wraps the runtime's response sender in a `MultiPartSender<S>`, and the
   `@RawRoute(.responseSender)` handler receives that transformed type — which constraint inference
@@ -143,8 +151,8 @@ cd HummingbirdExample && swift run HummingbirdExample
 ```
 
 Route verification lives in each package's test target, which drives the full CRUD lifecycle — both
-authoring styles, `/me`, `/export`, `/contact`, `/config`, `/upload` and `/wiring` — against a throwaway
-backend container it provisions
+authoring styles, `/me`, `/export`, `/contact`, `/config`, `/upload`, `/upload/stream` and `/wiring` —
+against a throwaway backend container it provisions
 via swift-local-containers. So `swift test` needs a container runtime (Docker); the suites skip
 themselves when none is available. Validated on macOS and Linux (see CI).
 
