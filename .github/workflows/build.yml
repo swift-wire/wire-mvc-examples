@@ -40,6 +40,13 @@ jobs:
       - name: Build
         working-directory: ${{ matrix.package }}
         run: swiftly run swift build
+      # `Controllers` is the one package with tests that need no container: the multipart parser is pure
+      # logic, and its suite drives the same input at every chunk size. Every other package's tests either
+      # need a datastore (the Integration job) or a server (the runtimes' own suites).
+      - name: Unit tests
+        if: matrix.package == 'Controllers'
+        working-directory: ${{ matrix.package }}
+        run: swiftly run swift test
 
   Integration:
     name: End-to-end / ${{ matrix.example }} (Docker) / Swift 6.4 (pinned)

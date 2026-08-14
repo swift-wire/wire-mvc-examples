@@ -50,6 +50,15 @@ let package = Package(
                 .product(name: "BasicContainers", package: "swift-collections"),
             ],
             swiftSettings: proposalSettings
-        )
+        ),
+        // Pure-logic unit tests. The only thing in this package that warrants them is the multipart parser:
+        // everything else here is a controller whose behaviour is a route, tested over the wire in each
+        // runtime's suite. A boundary parser is different — it is security-adjacent, its failure modes are
+        // silent (a two-byte corruption of every part), and it needs no server to exercise.
+        .testTarget(
+            name: "ControllersTests",
+            dependencies: ["Controllers"],
+            swiftSettings: proposalSettings
+        ),
     ]
 )
