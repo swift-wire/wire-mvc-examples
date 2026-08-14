@@ -4,13 +4,20 @@ import Foundation
 public import HTTPTypes
 public import WireMVC
 
-// `@MultipartBody` — the binding the streaming request tier was built for, declared outside WireMVC like
-// every other binding in this repo.
+// `@MultipartSummary` — the binding WireMVC's `.readerBody` tier was built for, declared outside WireMVC
+// like every other binding in this repo.
+//
+// **Named for what it hands back, not for what it reads.** It reads every byte of the upload; it hands the
+// handler a `MultipartForm` holding the small fields in full and, per file, a name, size and checksum —
+// never the content. A name ending in `Body` would promise the handler the one thing it never receives.
 //
 // `@FormBody` and `@YAMLBody` take `body: [UInt8]?`: the terminal collects the whole request first. That is
 // fine for a login form and wrong for an upload, which is the one shape of request whose size the server
-// does not choose. This one conforms to `RequestBodyStreaming` instead, so it is handed the reader and
+// does not choose. This one conforms to `RequestBodyReading` instead, so it is handed the reader and
 // walks it — peak memory is one chunk plus the fields it has decided to keep, whatever the upload's size.
+//
+// For the sibling that lets the handler act *before* the upload finishes, see `MultipartStream.swift`;
+// `UploadController.swift` sets the two side by side.
 //
 // Multipart *out* already exists next door (`MultiPartSender`, a sender-transforming middleware). This
 // closes the other direction, and neither required a change to WireMVC.
@@ -94,7 +101,7 @@ extension MultipartForm.Field {
 /// Not the parser's `MultipartError` alone: a route maps failures with `@ErrorResponse(E.self, …)` and can
 /// only name a type it can see. A binding that let another layer's error escape would make every such
 /// failure an unmapped 500 — the lesson `YAMLBody` learned the hard way.
-public enum MultipartBodyError: Error, Equatable {
+public enum MultipartBindingError: Error, Equatable {
     case notMultipart(contentType: String?)
     case malformed(MultipartError)
     /// A non-file field exceeded what this binding will hold in memory. Thrown **during** the walk: the
@@ -103,10 +110,10 @@ public enum MultipartBodyError: Error, Equatable {
     case tooManyParts
 }
 
-/// `@MultipartBody form: MultipartForm` — parses an upload without holding it.
-@RequestBinding(.streamingBody)
+/// `@MultipartSummary form: MultipartForm` — parses an upload without holding it.
+@RequestBinding(.readerBody)
 @propertyWrapper
-public struct MultipartBody<Value> {
+public struct MultipartSummary<Value> {
     public var wrappedValue: Value
     public init(wrappedValue: Value) { self.wrappedValue = wrappedValue }
     public init(wrappedValue: Value, _ name: String) { self.wrappedValue = wrappedValue }
@@ -118,8 +125,8 @@ public struct MultipartBody<Value> {
     public static var maximumParts: Int { 256 }
 }
 
-extension MultipartBody: RequestBodyStreaming where Value == MultipartForm {
-    public static func bindStreaming<Reader: AsyncReader & ~Copyable>(
+extension MultipartSummary: RequestBodyReading where Value == MultipartForm {
+    public static func bindReader<Reader: AsyncReader & ~Copyable>(
         name: String,
         request: HTTPRequest,
         pathParameters: [String: Substring],
@@ -129,7 +136,7 @@ extension MultipartBody: RequestBodyStreaming where Value == MultipartForm {
     where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields? {
         let contentType = request.headerFields[.contentType]
         guard let boundary = multipartBoundary(from: contentType) else {
-            throw MultipartBodyError.notMultipart(contentType: contentType)
+            throw MultipartBindingError.notMultipart(contentType: contentType)
         }
 
         var accumulator = MultipartAccumulator()
@@ -140,7 +147,7 @@ extension MultipartBody: RequestBodyStreaming where Value == MultipartForm {
             }
             try parser.finish()
         } catch let error as MultipartError {
-            throw MultipartBodyError.malformed(error)
+            throw MultipartBindingError.malformed(error)
         }
         return accumulator.form
     }
@@ -154,7 +161,7 @@ extension MultipartBody: RequestBodyStreaming where Value == MultipartForm {
 /// asymmetry is inherent to a parsed representation that discards content on purpose, not an oversight in
 /// the encoder. A caller wanting to upload real content builds the body itself; this exists so the route is
 /// reachable from the generated typed client at all, which without any send conformance it is not.
-extension MultipartBody: RequestBodySendable where Value == MultipartForm {
+extension MultipartSummary: RequestBodySendable where Value == MultipartForm {
     /// Fixed rather than random, because the generated client is used from tests and a body that differs
     /// between runs is a bad default for anything that might be recorded or compared.
     private static var clientBoundary: String { "WireMVCMultipartBoundary" }
@@ -212,8 +219,8 @@ private struct MultipartAccumulator {
     mutating func handle(_ event: MultipartEvent) throws {
         switch event {
         case .partBegan(let headers):
-            guard fields.count + files.count < MultipartBody<MultipartForm>.maximumParts else {
-                throw MultipartBodyError.tooManyParts
+            guard fields.count + files.count < MultipartSummary<MultipartForm>.maximumParts else {
+                throw MultipartBindingError.tooManyParts
             }
             let disposition = headers.first { $0.name.lowercased() == "content-disposition" }?.value ?? ""
             current = Current(
@@ -227,8 +234,8 @@ private struct MultipartAccumulator {
             part.byteCount += bytes.count
             for byte in bytes { part.checksum = (part.checksum ^ UInt64(byte)) &* 1_099_511_628_211 }
             if !part.isFile {
-                guard part.byteCount <= MultipartBody<MultipartForm>.maximumFieldBytes else {
-                    throw MultipartBodyError.fieldTooLarge(name: part.name)
+                guard part.byteCount <= MultipartSummary<MultipartForm>.maximumFieldBytes else {
+                    throw MultipartBindingError.fieldTooLarge(name: part.name)
                 }
                 part.bytes.append(contentsOf: bytes)
             }

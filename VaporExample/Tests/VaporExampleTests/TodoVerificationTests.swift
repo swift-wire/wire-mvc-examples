@@ -255,7 +255,7 @@ struct TodoVerificationTests {
             #expect(edited.status == .ok)
             #expect(String(buffer: edited.body).contains("replicas: 7"))
 
-            // A **streamed** request body through the adapter: `@MultipartBody` on WireMVC's streaming
+            // A **streamed** request body through the adapter: `@MultipartSummary` on WireMVC's streaming
             // request tier. As above, the adapter's bridge reader has already collected the bytes, so this
             // proves the binding and the wiring rather than a memory saving.
             let upload = try await execute(

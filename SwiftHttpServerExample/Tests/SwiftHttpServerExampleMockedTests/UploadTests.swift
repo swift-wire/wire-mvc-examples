@@ -3,7 +3,7 @@ import Foundation
 import Testing
 import WireMVCTesting
 
-/// `POST /upload` over the wire: `@MultipartBody` on the streaming request tier.
+/// `POST /upload` over the wire: `@MultipartSummary` on the `.readerBody` tier.
 ///
 /// The parser has its own suite in `Controllers`, driven at every chunk size. What is left to prove here is
 /// the wiring — that the terminal hands the binding the reader, that a real HTTP body parses, and that the

@@ -286,7 +286,7 @@ struct TodoVerificationTests {
             #expect(edited.status == .ok)
             #expect(String(buffer: edited.body).contains("replicas: 7"))
 
-            // A **streamed** request body through the adapter: `@MultipartBody` on WireMVC's streaming
+            // A **streamed** request body through the adapter: `@MultipartSummary` on WireMVC's streaming
             // request tier, parsing an upload chunk by chunk. Note the adapter's `BridgeReader` wraps bytes
             // it has already collected, so this streams the API and not the transport — the binding behaves
             // identically, and the memory benefit is real only on the proposal-native runtime.
