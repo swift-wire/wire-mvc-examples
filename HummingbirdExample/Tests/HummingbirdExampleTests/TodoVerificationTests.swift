@@ -287,9 +287,9 @@ struct TodoVerificationTests {
             #expect(String(buffer: edited.body).contains("replicas: 7"))
 
             // A **streamed** request body through the adapter: `@MultipartSummary` on WireMVC's streaming
-            // request tier, parsing an upload chunk by chunk. Note the adapter's `BridgeReader` wraps bytes
-            // it has already collected, so this streams the API and not the transport — the binding behaves
-            // identically, and the memory benefit is real only on the proposal-native runtime.
+            // request tier, parsing an upload chunk by chunk. The adapter's `BridgeReader` pulls one chunk
+            // per read off the transport's body, so the parser is fed as the upload arrives here as it is
+            // on the proposal-native runtime rather than from a body the bridge had already drained.
             let upload = try await client.execute(
                 uri: "/upload",
                 method: .post,
@@ -306,9 +306,9 @@ struct TodoVerificationTests {
             #expect(receipt.files.map(\.byteCount) == [5], "the file's bytes were counted, never held")
 
             // The **lent** stream, through the adapter: the handler pulls parts as they arrive and rejects
-            // on the first field, so the file after it is never read. Note the adapter's `BridgeReader`
-            // wraps bytes it has already collected, so what this proves here is the binding and the wiring
-            // — the memory saving is real only on the proposal-native runtime.
+            // on the first field, so the file after it is never read. What that saves is not asserted here
+            // — a status code cannot show bytes that were never received. The bridge's side of it (one
+            // chunk per read, no ceiling of its own) is pinned by `wire-mvc`'s own adapter suite.
             let abandoned = try await client.execute(
                 uri: "/upload/stream",
                 method: .post,

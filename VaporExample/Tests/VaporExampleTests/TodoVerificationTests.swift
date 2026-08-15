@@ -256,8 +256,8 @@ struct TodoVerificationTests {
             #expect(String(buffer: edited.body).contains("replicas: 7"))
 
             // A **streamed** request body through the adapter: `@MultipartSummary` on WireMVC's streaming
-            // request tier. As above, the adapter's bridge reader has already collected the bytes, so this
-            // proves the binding and the wiring rather than a memory saving.
+            // request tier. The adapter's bridge reader pulls one chunk per read off the transport's body,
+            // so the parser is fed as the upload arrives rather than from a body already drained for it.
             let upload = try await execute(
                 .POST,
                 "/upload",
@@ -271,8 +271,9 @@ struct TodoVerificationTests {
             #expect(receipt.fields["title"] == "Write M5")
             #expect(receipt.files.map(\.byteCount) == [5], "the file's bytes were counted, never held")
 
-            // The **lent** stream, through the adapter — as above, the bridge reader has already collected
-            // the bytes, so this proves the binding and the wiring rather than a memory saving.
+            // The **lent** stream, through the adapter — the handler rejects on the first field and never
+            // reads the file. What that saves is not asserted here: a status code cannot show bytes that
+            // were never received. The bridge's side of it is pinned by `wire-mvc`'s own adapter suite.
             let abandoned = try await execute(
                 .POST,
                 "/upload/stream",
