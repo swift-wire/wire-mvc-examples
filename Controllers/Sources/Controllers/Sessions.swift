@@ -1,5 +1,6 @@
 import Foundation
 import HTTPTypes
+public import Logging
 public import Wire
 public import WireMVC
 
@@ -105,6 +106,13 @@ public struct Me: Codable, Sendable, Equatable {
 @Controller("/me")
 @ErrorResponse(Unauthenticated.self, .unauthorized)
 public struct MeController<Repository: TodoRepository, Manager: SessionManager>: Sendable {
+    // The per-request logger. Unkeyed, so it resolves to whichever logging target the *app* depends on:
+    // `WireMVCLogging` mints one (the proposal runtime, Vapor), `WireMVCTaskLocalLogging` adopts the one
+    // the runtime already bound (Hummingbird's, carrying `hb.request.id`). This package names neither — a
+    // library that depended on one would force that choice on every consumer — and the same source serves
+    // all three runtimes unchanged. The app-scoped logger is keyed, so this bare spelling can only mean
+    // the request-scoped one.
+    @Inject var logger: Logger
     @Inject var session: Session<Manager>  // request-scoped, generic over the opaque store
     // The app's opaque-lifted backend (`@Singleton(as: TodoRepository.self)`, `some TodoRepository`),
     // injected as a lifted generic parameter — the same portable shape `TodosController` uses. A
@@ -116,7 +124,12 @@ public struct MeController<Repository: TodoRepository, Manager: SessionManager>:
     public func me() async throws -> Me {
         // Prove the opaque backend resolves into (and is callable from) a request-scoped controller.
         _ = try await repository.all()
-        return Me(user: session.user, id: try await session.id())
+        let identity = Me(user: session.user, id: try await session.id())
+        // Carries the request-id metadata its target attached, so this line correlates with everything
+        // else logged for the same request — including the framework's own, on a runtime whose logger we
+        // adopted rather than replaced.
+        logger.info("resolved identity", metadata: ["user": .string(identity.user)])
+        return identity
     }
 }
 

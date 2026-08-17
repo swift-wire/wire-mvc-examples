@@ -1,4 +1,5 @@
 import Controllers
+import Configuration
 import Logging
 import Valkey
 import Wire
@@ -18,15 +19,16 @@ import Foundation
 /// `@BackgroundService` on a `@Provides` function aliases `@Contributes(to: WireMVCKeys.services)`;
 /// `ValkeyClient` already conforms to `Service`, so no conformance is added.
 ///
-/// Connection config comes from the environment, 12-factor style — the test exports the container's
-/// host/port; a real deployment sets them however it manages config. The client doesn't connect here;
+/// Connection settings come from the graph's shared `ConfigReader`, injected like any other dependency
+/// rather than read from `ProcessInfo` here. swift-configuration maps each key to an environment variable
+/// (`valkey.host` → `VALKEY_HOST`), so the deployment contract is unchanged; what changes is that the
+/// reader is visible in the graph and substitutable in a test. The client doesn't connect here;
 /// it connects when the service group runs it.
 @Provides
 @BackgroundService
-func provideValkeyClient() -> ValkeyClient {
-    let environment = ProcessInfo.processInfo.environment
-    let host = environment["VALKEY_HOST"] ?? "localhost"
-    let port = environment["VALKEY_PORT"].flatMap(Int.init) ?? 6379
+func provideValkeyClient(config: ConfigReader) -> ValkeyClient {
+    let host = config.string(forKey: "valkey.host", default: "localhost")
+    let port = config.int(forKey: "valkey.port", default: 6379)
     return ValkeyClient(.hostname(host, port: port), logger: Logger(label: "valkey"))
 }
 

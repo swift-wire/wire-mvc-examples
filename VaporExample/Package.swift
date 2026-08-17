@@ -56,6 +56,9 @@ let package = Package(
                 .product(name: "OpenAPIVapor", package: "swift-openapi-vapor"),
                 .product(name: "MongoKitten", package: "MongoKitten"),
                 .product(name: "Configuration", package: "swift-configuration"),
+                // Vapor binds no task-local logger (its request logger is a stored property on `Request`),
+                // so WireMVC mints the per-request one — the runtime-independent target.
+                .product(name: "WireMVCLogging", package: "wire-mvc"),
                 // This runtime binds no services, but the generated `_WireGraph: WireMVCComposable`
                 // conformance references `any Service`.
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),

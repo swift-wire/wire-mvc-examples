@@ -31,6 +31,9 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/tachyonics/wire-mvc.git", branch: "main"),
+        // `Logger` appears in MeController's injected surface. Named explicitly rather than relied on
+        // transitively; this package still names no *logging target*, so consumers keep that choice.
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.14.0"),
         .package(url: "https://github.com/tachyonics/swift-wire.git", branch: "main"),
         // The `@RawRoute` streaming route touches the proposal's raw HTTP primitives directly
         // (`HTTPResponseSender`, `HTTPResponse`, `HTTPFields`, `UniqueArray`) — inherent to a raw
@@ -44,6 +47,7 @@ let package = Package(
             name: "Controllers",
             dependencies: [
                 .product(name: "WireMVC", package: "wire-mvc"),
+                .product(name: "Logging", package: "swift-log"),
                 .product(name: "Wire", package: "swift-wire"),
                 .product(name: "HTTPAPIs", package: "swift-http-api-proposal"),
                 .product(name: "HTTPTypes", package: "swift-http-types"),
