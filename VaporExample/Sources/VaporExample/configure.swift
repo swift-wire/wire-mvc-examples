@@ -1,6 +1,6 @@
-import OpenAPIVapor  // VaporTransport (a ServerTransport)
 import Configuration
 import Logging
+import OpenAPIVapor  // VaporTransport (a ServerTransport)
 import Vapor
 import Wire
 import WireMVC

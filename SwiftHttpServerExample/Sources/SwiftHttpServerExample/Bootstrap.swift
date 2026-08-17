@@ -1,6 +1,6 @@
+package import Configuration
 package import HTTPAPIs
 import HTTPTypes
-package import Configuration
 import Logging
 package import NIOHTTPServer
 package import Wire

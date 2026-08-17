@@ -1,12 +1,12 @@
 public import Configuration
 import Hummingbird
 import Logging
-import Wire
 // Conformance-only import: provides `extension Router: ServerTransport`, which
 // `WireMVCServerTransport.apply` needs but no symbol here names, so the unused_import analyzer can't
 // see it's required.
 // swiftlint:disable:next unused_import
 import OpenAPIHummingbird
+import Wire
 import WireMVC
 import WireMVCServerTransport
 
