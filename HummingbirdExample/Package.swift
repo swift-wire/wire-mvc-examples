@@ -20,6 +20,8 @@ let package = Package(
     platforms: [.macOS(.v26)],
     dependencies: [
         .package(path: "../Controllers"),
+        // 12-factor configuration, built once before the graph and passed in as a graph input.
+        .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0"),
         // The `html-form` example. A sibling package because it depends on Elementary and `Controllers`
         // deliberately does not; its `Elementary` trait request on wire-mvc unions with this runtime's
         // `ServerTransport` one. Here it also demonstrates that a streamed `@HTMLResponse` reaches the
@@ -50,6 +52,10 @@ let package = Package(
                 .product(name: "OpenAPISpec", package: "OpenAPISpec"),
                 .product(name: "WireMVC", package: "wire-mvc"),
                 .product(name: "WireMVCServerTransport", package: "wire-mvc"),
+                // The *adopting* logging target: Hummingbird already binds a per-request logger carrying
+                // `hb.request.id` as a task-local, so WireMVC uses that one rather than minting a rival.
+                .product(name: "WireMVCTaskLocalLogging", package: "wire-mvc"),
+                .product(name: "Configuration", package: "swift-configuration"),
                 .product(name: "WireOpenAPI", package: "wire-open-api"),
                 .product(name: "Wire", package: "swift-wire"),
                 .product(name: "Hummingbird", package: "hummingbird"),

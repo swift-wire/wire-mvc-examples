@@ -1,5 +1,8 @@
+import Configuration
+import Logging
 import OpenAPIVapor  // VaporTransport (a ServerTransport)
 import Vapor
+import Wire
 import WireMVC
 import WireMVCServerTransport
 
@@ -11,7 +14,10 @@ import WireMVCServerTransport
 // mount the cross-runtime introspection endpoint. The container's lifecycle is tied to the app:
 // `@Teardown` runs on shutdown via a lifecycle handler.
 func configure(_ app: Application) async throws {
-    let graph = try await Wire.bootstrap()
+    // This function is the pre-step: the same two things happen before construction that `prepare()` does
+    // in the proposal runtime's `@WireMVCBootstrap` app — bootstrap logging, then build the one
+    // `ConfigReader` the graph shares and hand it in as a graph input.
+    let graph = try await Wire.bootstrap(inputs: bootstrapConfiguration())
 
     // A native Vapor route — coexists with the WireMVC-applied /todos/* on the same app.
     app.get("health") { _ in "OK" }
@@ -37,4 +43,27 @@ struct WireGraphTeardown: LifecycleHandler {
             application.logger.report(error: error)
         }
     }
+}
+
+/// The graph's inputs — the `ConfigReader` every provider injects instead of building its own. Declared in
+/// this package rather than in `Controllers`: inputs are the consumer's to supply, and a library cannot
+/// decide what its consumers must pass in.
+@GraphInputs
+struct AppInputs: Sendable {
+    let config: ConfigReader
+}
+
+/// Bootstrap the logging system, then build the inputs. The order is the point: swift-log captures the
+/// unbound default logger at first access, so bootstrapping after the graph is built would leave
+/// already-constructed bindings holding a logger that ignores this configuration. The level comes from
+/// config (`LOG_LEVEL`), which is the ordinary reason to want configuration first.
+private func bootstrapConfiguration() -> AppInputs {
+    let config = ConfigReader(providers: [EnvironmentVariablesProvider()])
+    let level = Logger.Level(rawValue: config.string(forKey: "log.level", default: "info")) ?? .info
+    LoggingSystem.bootstrap { label in
+        var handler = StreamLogHandler.standardOutput(label: label)
+        handler.logLevel = level
+        return handler
+    }
+    return AppInputs(config: config)
 }

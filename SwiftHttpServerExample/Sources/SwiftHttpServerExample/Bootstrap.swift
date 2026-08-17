@@ -1,3 +1,4 @@
+package import Configuration
 package import HTTPAPIs
 import HTTPTypes
 import Logging
@@ -33,6 +34,29 @@ package struct AppBootstrap {
     )
 
     @Inject let config: ServerConfig
+
+    /// The **pre-step**: runs before `Wire.bootstrap`, and its return value is the graph's `inputs:`.
+    ///
+    /// Two things have to happen before any binding exists, and this is the only place they can:
+    ///
+    /// 1. **`LoggingSystem.bootstrap`.** It traps on a second call and, more importantly, the unbound
+    ///    default logger is captured at first access — so bootstrapping after the graph is built would
+    ///    leave every binding constructed so far holding a logger that ignores this configuration. The
+    ///    level itself comes from config (`LOG_LEVEL`), which is the ordinary reason to want config first.
+    /// 2. **Building the `ConfigReader`** the whole graph shares, and handing it in as an input.
+    ///
+    /// Being pre-graph it can inject nothing — that is the trade for running first, and why it reads the
+    /// environment directly here and nowhere else.
+    package static func prepare() throws -> AppInputs {
+        let config = ConfigReader(providers: [EnvironmentVariablesProvider()])
+        let level = Logger.Level(rawValue: config.string(forKey: "log.level", default: "info")) ?? .info
+        LoggingSystem.bootstrap { label in
+            var handler = StreamLogHandler.standardOutput(label: label)
+            handler.logLevel = level
+            return handler
+        }
+        return AppInputs(config: config)
+    }
 
     // Returns the *concrete* server, not `some HTTPServer`: the proposal's `Reader`/`ResponseSender`
     // are `~Copyable`, which a bare `some HTTPServer` opaque return can't express. The generated
@@ -80,9 +104,31 @@ package struct ServerConfig: Sendable {
     }
 }
 
-/// The production binding for `ServerConfig` — a `@Provides` factory binding the fixed production port
-/// `8080`. Only the app's own `createServer()` reads it: a suite serves on the server its
-/// `WireMVCTestMode` carries, so no test target has to `@Replaces` this.
-@Provides package func serverConfig() -> ServerConfig {
-    ServerConfig(host: "127.0.0.1", port: 8080)
+/// The production binding for `ServerConfig`, now read from configuration rather than hardcoded: the bind
+/// address is a deployment fact, which is exactly what a graph *input* carries. It injects the shared
+/// `ConfigReader` like any other binding — no provider builds its own reader any more.
+///
+/// `server.host` → `SERVER_HOST`, `server.port` → `SERVER_PORT`, with the old fixed values as defaults so
+/// `swift run` still serves on `127.0.0.1:8080` with nothing exported. Only the app's own `createServer()`
+/// reads it: a suite serves on the server its `WireMVCTestMode` carries.
+@Provides package func serverConfig(config: ConfigReader) -> ServerConfig {
+    ServerConfig(
+        host: config.string(forKey: "server.host", default: "127.0.0.1"),
+        port: config.int(forKey: "server.port", default: 8080)
+    )
+}
+
+/// The graph's inputs — the values built *before* construction and handed in by ``AppBootstrap/prepare()``.
+///
+/// One `ConfigReader` for the whole app, rather than each provider constructing its own: a provider that
+/// reads the environment for itself is untestable and invisible in the graph, where an injected reader is
+/// an ordinary dependency. Declared here in the app package rather than in `Controllers`, because inputs
+/// are the *consumer's* to supply — a library cannot decide what its consumers must pass in.
+@GraphInputs
+package struct AppInputs: Sendable {
+    package let config: ConfigReader
+
+    package init(config: ConfigReader) {
+        self.config = config
+    }
 }

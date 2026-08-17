@@ -1,9 +1,12 @@
+public import Configuration
 import Hummingbird
+import Logging
 // Conformance-only import: provides `extension Router: ServerTransport`, which
 // `WireMVCServerTransport.apply` needs but no symbol here names, so the unused_import analyzer can't
 // see it's required.
 // swiftlint:disable:next unused_import
 import OpenAPIHummingbird
+import Wire
 import WireMVC
 import WireMVCServerTransport
 
@@ -28,7 +31,10 @@ public protocol AppArguments {
 /// the server and stops it at shutdown — the graph hosting a `ServiceLifecycle` service, WireMVC's
 /// `services` collation applied end to end.
 public func buildApplication(_ arguments: some AppArguments) async throws -> some ApplicationProtocol {
-    let graph = try await Wire.bootstrap()
+    // Hand-assembled rather than `@WireMVCBootstrap`, so this function *is* the pre-step: the same two
+    // things happen before construction that `prepare()` does in the proposal runtime's app — bootstrap
+    // logging, then build the one `ConfigReader` the graph shares and pass it in as a graph input.
+    let graph = try await Wire.bootstrap(inputs: bootstrapConfiguration())
 
     let router = Router()
     // A native Hummingbird route, registered the framework's own way — coexists with the
@@ -44,4 +50,35 @@ public func buildApplication(_ arguments: some AppArguments) async throws -> som
         configuration: .init(address: .hostname(arguments.hostname, port: arguments.port)),
         services: services
     )
+}
+
+/// The graph's inputs — the `ConfigReader` every provider injects instead of reading the environment for
+/// itself. Declared in this package, not in `Controllers`: inputs are the consumer's to supply, and a
+/// library cannot decide what its consumers must pass in.
+@GraphInputs
+public struct AppInputs: Sendable {
+    public let config: ConfigReader
+
+    public init(config: ConfigReader) {
+        self.config = config
+    }
+}
+
+/// Bootstrap the logging system, then build the inputs. Ordering matters and only runs correctly here:
+/// swift-log captures the unbound default logger at first access, so bootstrapping after the graph is
+/// built would leave already-constructed bindings holding a logger that ignores this configuration.
+///
+/// The level comes from config (`LOG_LEVEL`) — the ordinary reason to want configuration before logging.
+/// Hummingbird binds its own per-request logger as a task-local on top of whatever handler is installed
+/// here, and `WireMVCTaskLocalLogging` adopts *that*, so a controller's log line carries the framework's
+/// own `hb.request.id` rather than a second, disagreeing id.
+private func bootstrapConfiguration() -> AppInputs {
+    let config = ConfigReader(providers: [EnvironmentVariablesProvider()])
+    let level = Logger.Level(rawValue: config.string(forKey: "log.level", default: "info")) ?? .info
+    LoggingSystem.bootstrap { label in
+        var handler = StreamLogHandler.standardOutput(label: label)
+        handler.logLevel = level
+        return handler
+    }
+    return AppInputs(config: config)
 }

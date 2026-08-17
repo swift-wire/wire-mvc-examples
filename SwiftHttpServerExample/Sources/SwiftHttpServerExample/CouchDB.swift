@@ -1,4 +1,5 @@
 import AsyncHTTPClient
+package import Configuration
 import HTTPTypes
 package import Wire
 
@@ -20,13 +21,16 @@ package enum CouchDB {
 /// async-http-client `.shared` instance: the proposal's default client is URLSession-backed on macOS and
 /// currently hangs collecting keep-alive responses on the nightly toolchain, so pinning `.shared` keeps the
 /// same call surface working on macOS and Linux with no explicit shutdown.
+/// Connection settings come from the graph's shared `ConfigReader` — injected like any other dependency,
+/// rather than this provider reaching for `ProcessInfo` on its own. swift-configuration maps each key to an
+/// environment variable (`couchdb.host` → `COUCHDB_HOST`), so the deployment contract is unchanged; what
+/// changes is that the reader is visible in the graph and substitutable in a test.
 @Provides(CouchDB.client)
-package func provideCouchDBClient() -> ConfiguredHTTPClient {
-    let environment = ProcessInfo.processInfo.environment
-    let host = environment["COUCHDB_HOST"] ?? "localhost"
-    let port = environment["COUCHDB_PORT"] ?? "5984"
-    let user = environment["COUCHDB_USER"] ?? "admin"
-    let password = environment["COUCHDB_PASSWORD"] ?? "password"
+package func provideCouchDBClient(config: ConfigReader) -> ConfiguredHTTPClient {
+    let host = config.string(forKey: "couchdb.host", default: "localhost")
+    let port = config.int(forKey: "couchdb.port", default: 5984)
+    let user = config.string(forKey: "couchdb.user", default: "admin")
+    let password = config.string(forKey: "couchdb.password", default: "password")
     return ConfiguredHTTPClient(
         client: .shared,
         baseURL: "http://\(host):\(port)",

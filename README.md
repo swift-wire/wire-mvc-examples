@@ -145,9 +145,11 @@ The same goes for `OpenAPISpec`: one document, one `@OpenAPIController`, three r
 
 ## Running
 
-Each package is standalone; run its executable from its directory (it reads its backend's connection
-from the environment — e.g. `VALKEY_HOST`/`VALKEY_PORT` for Hummingbird — against a real store you
-provide):
+Each package is standalone; run its executable from its directory. Configuration is read through
+swift-configuration, which maps each key to an environment variable — the backend's connection
+(`VALKEY_HOST`/`VALKEY_PORT` for Hummingbird, `COUCHDB_*`, `MONGO_*`), the bind address
+(`SERVER_HOST`/`SERVER_PORT`, proposal runtime), and `LOG_LEVEL`. All have defaults, so this runs against
+a real store you provide with nothing else exported:
 
 ```
 cd HummingbirdExample && swift run HummingbirdExample
