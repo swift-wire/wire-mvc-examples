@@ -112,7 +112,8 @@ struct TodosRoutingTests {
             #expect(patched.status == 200)
             #expect(try patched.json(Todo.self).completed == true)
 
-            // GET /todos/stream (@RawRoute) — one SSE event per todo. Add a second so the stream is more than one
+            // GET /todos/stream (@EventStreamResponse) — one SSE event per todo, framed by ServerSentEventProducer
+            // on the streaming tier. Add a second so the stream is more than one
             // write, assert both events are present and there are exactly two, then remove the second.
             let created2 = try await client.post("/todos", json: ["title": "Walk dog"]).json(Todo.self)
             let stream = try await client.get("/todos/stream")

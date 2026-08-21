@@ -118,7 +118,8 @@ struct TodoVerificationTests {
             #expect(patched.status == .ok)
             #expect(try decode(Todo.self, patched).completed)
 
-            // WireMVC: @RawRoute SSE — streamed through the WireMVCServerTransport bridge onto Hummingbird.
+            // WireMVC: @EventStreamResponse SSE — the streaming producer tier, through the
+            // WireMVCServerTransport bridge onto Hummingbird.
             // A second todo makes it a genuine multi-event stream; assert both events are present (order
             // isn't guaranteed) and that there are exactly two, then remove the second.
             let created2 = try await client.execute(
