@@ -2,6 +2,7 @@ import Configuration
 import Controllers
 import MongoKitten
 import Wire
+import WireConfiguration
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -16,13 +17,14 @@ import Foundation
 /// works within its own collection (`todos`, `sessions`).
 @Provides
 @Teardown({ (database: MongoDatabase) in await (database.pool as? MongoCluster)?.disconnect() })
-func provideMongoDatabase(config: ConfigReader) async throws -> MongoDatabase {
+func provideMongoDatabase(
+    @ConfigProperty(forKey: "mongo.host", default: "localhost") host: String,
+    @ConfigProperty(forKey: "mongo.port", default: 27017) port: Int
+) async throws -> MongoDatabase {
     // Connection settings come from the graph's shared `ConfigReader`, injected like any other dependency
     // rather than constructed here. swift-configuration maps each key to an env var (`mongo.host` →
     // `MONGO_HOST`), so the deployment contract is unchanged; what changes is that the reader is visible in
     // the graph and substitutable in a test.
-    let host = config.string(forKey: "mongo.host", default: "localhost")
-    let port = config.int(forKey: "mongo.port", default: 27017)
     return try await MongoDatabase.connect(to: "mongodb://\(host):\(port)/todos")
 }
 

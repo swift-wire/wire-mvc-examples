@@ -31,6 +31,9 @@ let package = Package(
         // 12-factor configuration: one `ConfigReader` built before the graph and passed in as a graph
         // input, rather than each provider reading the environment for itself.
         .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0"),
+        // `@ConfigProperty` — reads a value at the injection site, so a provider depends on the value
+        // rather than on a reader it has to call.
+        .package(url: "https://github.com/tachyonics/wire-configuration.git", branch: "main"),
         .package(path: "../OpenAPISpec"),
         // The `html-form` example. A sibling package because it depends on Elementary and `Controllers`
         // deliberately does not — same reason `OpenAPISpec` is one. Its `Elementary` trait request on wire-mvc
@@ -83,6 +86,9 @@ let package = Package(
                 // The runtime-independent logging target: this runtime binds no task-local logger, so
                 // WireMVC mints the per-request one. (HummingbirdExample picks the other target.)
                 .product(name: "WireMVCLogging", package: "wire-mvc"),
+                // `@ConfigProperty`, and the reader it resolves against: `Configuration` for the
+                // `ConfigReader` this app builds in `prepare()` and hands in as a graph input.
+                .product(name: "WireConfiguration", package: "wire-configuration"),
                 .product(name: "Configuration", package: "swift-configuration"),
                 // Opt-in middleware: CORS as a global @Middleware on the composition root. Only this runtime
                 // has one — Hummingbird and Vapor mount through WireMVCServerTransport onto their own
@@ -128,6 +134,10 @@ let package = Package(
                 // A test target is its own Wire consumer, so it activates the logging target itself —
                 // depend-to-activate does not inherit through the app it re-composes.
                 .product(name: "WireMVCLogging", package: "wire-mvc"),
+                // A test target is its own Wire consumer, so it activates `@ConfigProperty` itself —
+                // depend-to-activate does not inherit through the app it re-composes. Without it the
+                // annotation is not recognised and each annotated site falls back to resolving by type.
+                .product(name: "WireConfiguration", package: "wire-configuration"),
                 // Opt-in middleware: CORS as a global @Middleware on the composition root. Only this runtime
                 // has one — Hummingbird and Vapor mount through WireMVCServerTransport onto their own
                 // Application, so there is no generated @main and therefore no global tier to fold into.
@@ -175,6 +185,10 @@ let package = Package(
                 // A test target is its own Wire consumer, so it activates the logging target itself —
                 // depend-to-activate does not inherit through the app it re-composes.
                 .product(name: "WireMVCLogging", package: "wire-mvc"),
+                // A test target is its own Wire consumer, so it activates `@ConfigProperty` itself —
+                // depend-to-activate does not inherit through the app it re-composes. Without it the
+                // annotation is not recognised and each annotated site falls back to resolving by type.
+                .product(name: "WireConfiguration", package: "wire-configuration"),
                 // Opt-in middleware: CORS as a global @Middleware on the composition root. Only this runtime
                 // has one — Hummingbird and Vapor mount through WireMVCServerTransport onto their own
                 // Application, so there is no generated @main and therefore no global tier to fold into.

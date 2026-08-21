@@ -1,5 +1,5 @@
 {
-  "originHash" : "8a6dc57501bea0de5271a2aaefaa73e744e60cdb064540b02360e5b16f7eb78d",
+  "originHash" : "5a21c78a2ef251bb8c182683284ee151e0c17c5f365e5a8b207dd0a8be228f50",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -41,8 +41,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/grpc/grpc-swift-nio-transport.git",
       "state" : {
-        "revision" : "c46f77c07c3ae4fce4734e7af03fcb35ab544428",
-        "version" : "2.9.1"
+        "revision" : "eaad084d6c26ff1f2e96f9c2ab76ef84d7165ab6",
+        "version" : "2.9.2"
       }
     },
     {
@@ -177,7 +177,7 @@
       "location" : "https://github.com/swift-server/swift-http-server.git",
       "state" : {
         "branch" : "main",
-        "revision" : "15fb0327a17547d8eb736da77a6b1bd899a53110"
+        "revision" : "b7c5b1fbd8c1f9c9a6d0d64c546cb8884748ecbe"
       }
     },
     {
@@ -310,8 +310,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swift-server/swift-service-lifecycle.git",
       "state" : {
-        "revision" : "9829955b385e5bb88128b73f1b8389e9b9c3191a",
-        "version" : "2.11.0"
+        "revision" : "7f9326b0326ff86e3646295ea6e891f68c471c5e",
+        "version" : "2.12.0"
       }
     },
     {
@@ -338,7 +338,16 @@
       "location" : "https://github.com/tachyonics/swift-wire.git",
       "state" : {
         "branch" : "main",
-        "revision" : "c442490119affb3c4db5a7cac8920cddbaaa42f9"
+        "revision" : "4bfc794a7ae696268e6db0bdebe6026624376d70"
+      }
+    },
+    {
+      "identity" : "wire-configuration",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tachyonics/wire-configuration.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "6e855a42e36c6eae761d36fa5141f81b6f5b5dc0"
       }
     },
     {
@@ -347,7 +356,7 @@
       "location" : "https://github.com/tachyonics/wire-mvc.git",
       "state" : {
         "branch" : "main",
-        "revision" : "eac8e0635b529cd6b006dd4d7c2477edc56a6d44"
+        "revision" : "727a301418fcdb1959055ef60da61c47a3abf1d3"
       }
     },
     {

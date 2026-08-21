@@ -22,6 +22,9 @@ let package = Package(
         .package(path: "../Controllers"),
         // 12-factor configuration, built once before the graph and passed in as a graph input.
         .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0"),
+        // `@ConfigProperty` — reads a value at the injection site, so a provider depends on the value
+        // rather than on a reader it has to call.
+        .package(url: "https://github.com/tachyonics/wire-configuration.git", branch: "main"),
         // The `html-form` example. A sibling package because it depends on Elementary and `Controllers`
         // deliberately does not; its `Elementary` trait request on wire-mvc unions with this runtime's
         // `ServerTransport` one. Here it also demonstrates that a streamed `@HTMLResponse` reaches the
@@ -56,6 +59,7 @@ let package = Package(
                 // `hb.request.id` as a task-local, so WireMVC uses that one rather than minting a rival.
                 .product(name: "WireMVCTaskLocalLogging", package: "wire-mvc"),
                 .product(name: "Configuration", package: "swift-configuration"),
+                .product(name: "WireConfiguration", package: "wire-configuration"),
                 .product(name: "WireOpenAPI", package: "wire-open-api"),
                 .product(name: "Wire", package: "swift-wire"),
                 .product(name: "Hummingbird", package: "hummingbird"),

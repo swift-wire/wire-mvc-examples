@@ -1,7 +1,7 @@
 import AsyncHTTPClient
-package import Configuration
 import HTTPTypes
 package import Wire
+package import WireConfiguration
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -26,11 +26,13 @@ package enum CouchDB {
 /// environment variable (`couchdb.host` → `COUCHDB_HOST`), so the deployment contract is unchanged; what
 /// changes is that the reader is visible in the graph and substitutable in a test.
 @Provides(CouchDB.client)
-package func provideCouchDBClient(config: ConfigReader) -> ConfiguredHTTPClient {
-    let host = config.string(forKey: "couchdb.host", default: "localhost")
-    let port = config.int(forKey: "couchdb.port", default: 5984)
-    let user = config.string(forKey: "couchdb.user", default: "admin")
-    let password = config.string(forKey: "couchdb.password", default: "password")
+package func provideCouchDBClient(
+    @ConfigProperty(forKey: "couchdb.host", default: "localhost") host: String,
+    @ConfigProperty(forKey: "couchdb.port", default: 5984) port: Int,
+    @ConfigProperty(forKey: "couchdb.user", default: "admin") user: String,
+    // The one value worth marking: `isSecret` governs redaction in logging and debugging.
+    @ConfigProperty(forKey: "couchdb.password", default: "password", isSecret: true) password: String
+) -> ConfiguredHTTPClient {
     return ConfiguredHTTPClient(
         client: .shared,
         baseURL: "http://\(host):\(port)",

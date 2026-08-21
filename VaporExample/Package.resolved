@@ -1,5 +1,5 @@
 {
-  "originHash" : "1208e330da9a03ab2739d3f7d91f8553d2921100dc8cdbcc3d843013fa98b5f8",
+  "originHash" : "d33243b8238fddaa581cd1ebbf50a907bbd1fcf767921c1af8df09c015e60f12",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -401,7 +401,7 @@
       "location" : "https://github.com/tachyonics/swift-wire.git",
       "state" : {
         "branch" : "main",
-        "revision" : "c442490119affb3c4db5a7cac8920cddbaaa42f9"
+        "revision" : "4bfc794a7ae696268e6db0bdebe6026624376d70"
       }
     },
     {
@@ -420,6 +420,15 @@
       "state" : {
         "revision" : "90bbbdab3ede12c803cfbe91646f291c092517a3",
         "version" : "2.16.2"
+      }
+    },
+    {
+      "identity" : "wire-configuration",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tachyonics/wire-configuration.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "6e855a42e36c6eae761d36fa5141f81b6f5b5dc0"
       }
     },
     {
