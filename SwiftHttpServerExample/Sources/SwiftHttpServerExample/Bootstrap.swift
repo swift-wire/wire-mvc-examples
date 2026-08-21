@@ -7,6 +7,7 @@ package import Wire
 package import WireMVC
 package import WireMVCMiddleware
 import WireMVCRouter
+package import WireConfiguration
 
 // The WireMVC-native composition root. `@Singleton` makes it a graph binding (its `@Inject` resolves);
 // `@WireMVCBootstrap` makes the plugin generate the program entry point (`@main`) for a program consumer,
@@ -35,6 +36,7 @@ package struct AppBootstrap {
 
     @Inject let config: ServerConfig
 
+
     /// The **pre-step**: runs before `Wire.bootstrap`, and its return value is the graph's `inputs:`.
     ///
     /// Two things have to happen before any binding exists, and this is the only place they can:
@@ -57,7 +59,6 @@ package struct AppBootstrap {
         }
         return AppInputs(config: config)
     }
-
     // Returns the *concrete* server, not `some HTTPServer`: the proposal's `Reader`/`ResponseSender`
     // are `~Copyable`, which a bare `some HTTPServer` opaque return can't express. The generated
     // `@main` (and `.wiremvc()` suite trait) binds to whatever concrete type this returns.
@@ -104,26 +105,16 @@ package struct ServerConfig: Sendable {
     }
 }
 
-/// The production binding for `ServerConfig`, now read from configuration rather than hardcoded: the bind
-/// address is a deployment fact, which is exactly what a graph *input* carries. It injects the shared
-/// `ConfigReader` like any other binding — no provider builds its own reader any more.
-///
-/// `server.host` → `SERVER_HOST`, `server.port` → `SERVER_PORT`, with the old fixed values as defaults so
-/// `swift run` still serves on `127.0.0.1:8080` with nothing exported. Only the app's own `createServer()`
-/// reads it: a suite serves on the server its `WireMVCTestMode` carries.
-@Provides package func serverConfig(config: ConfigReader) -> ServerConfig {
-    ServerConfig(
-        host: config.string(forKey: "server.host", default: "127.0.0.1"),
-        port: config.int(forKey: "server.port", default: 8080)
-    )
-}
-
 /// The graph's inputs — the values built *before* construction and handed in by ``AppBootstrap/prepare()``.
 ///
-/// One `ConfigReader` for the whole app, rather than each provider constructing its own: a provider that
-/// reads the environment for itself is untestable and invisible in the graph, where an injected reader is
-/// an ordinary dependency. Declared here in the app package rather than in `Controllers`, because inputs
-/// are the *consumer's* to supply — a library cannot decide what its consumers must pass in.
+/// The reader stays an input even though no provider below calls it any more: `@ConfigProperty` does not
+/// remove the reader, it moves the *call*. Each annotated parameter becomes a synthesised producer that
+/// resolves a `ConfigReader` from the graph like any other dependency, so something still has to bind one.
+/// Making it an input rather than a `@Provides` keeps it built before the graph, alongside the logging
+/// bootstrap that has to run first.
+///
+/// Declared in the app package rather than in `Controllers`, because inputs are the *consumer's* to
+/// supply — a library cannot decide what its consumers must pass in.
 @GraphInputs
 package struct AppInputs: Sendable {
     package let config: ConfigReader
@@ -131,4 +122,17 @@ package struct AppInputs: Sendable {
     package init(config: ConfigReader) {
         self.config = config
     }
+}
+
+/// The production binding for `ServerConfig`, read from configuration rather than hardcoded: the bind
+/// address is a deployment fact.
+///
+/// `server.host` → `SERVER_HOST`, `server.port` → `SERVER_PORT`, with the old fixed values as defaults so
+/// `swift run` still serves on `127.0.0.1:8080` with nothing exported. Only the app's own `createServer()`
+/// reads it: a suite serves on the server its `WireMVCTestMode` carries.
+@Provides package func serverConfig(
+    @ConfigProperty(forKey: "server.host", default: "127.0.0.1") host: String,
+    @ConfigProperty(forKey: "server.port", default: 8080) port: Int
+) -> ServerConfig {
+    ServerConfig(host: host, port: port)
 }

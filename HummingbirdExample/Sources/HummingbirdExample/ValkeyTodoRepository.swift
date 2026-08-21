@@ -4,6 +4,7 @@ import Logging
 import Valkey
 import Wire
 import WireMVC  // @BackgroundService
+import WireConfiguration
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -26,10 +27,11 @@ import Foundation
 /// it connects when the service group runs it.
 @Provides
 @BackgroundService
-func provideValkeyClient(config: ConfigReader) -> ValkeyClient {
-    let host = config.string(forKey: "valkey.host", default: "localhost")
-    let port = config.int(forKey: "valkey.port", default: 6379)
-    return ValkeyClient(.hostname(host, port: port), logger: Logger(label: "valkey"))
+func provideValkeyClient(
+    @ConfigProperty(forKey: "valkey.host", default: "localhost") host: String,
+    @ConfigProperty(forKey: "valkey.port", default: 6379) port: Int
+) -> ValkeyClient {
+    ValkeyClient(.hostname(host, port: port), logger: Logger(label: "valkey"))
 }
 
 /// The Hummingbird runtime's backend — a real Valkey, a key-value store (distinct from Vapor's MongoDB
