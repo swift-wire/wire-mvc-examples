@@ -3,8 +3,8 @@ import Controllers
 import Logging
 import Valkey
 import Wire
-import WireMVC  // @BackgroundService
 import WireConfiguration
+import WireMVC  // @BackgroundService
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials

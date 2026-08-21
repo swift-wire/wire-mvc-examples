@@ -1,8 +1,8 @@
 import Configuration
-import WireConfiguration
 import Controllers
 import MongoKitten
 import Wire
+import WireConfiguration
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials

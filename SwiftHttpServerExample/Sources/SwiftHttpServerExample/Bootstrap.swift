@@ -4,10 +4,10 @@ import HTTPTypes
 import Logging
 package import NIOHTTPServer
 package import Wire
+package import WireConfiguration
 package import WireMVC
 package import WireMVCMiddleware
 import WireMVCRouter
-package import WireConfiguration
 
 // The WireMVC-native composition root. `@Singleton` makes it a graph binding (its `@Inject` resolves);
 // `@WireMVCBootstrap` makes the plugin generate the program entry point (`@main`) for a program consumer,
@@ -35,7 +35,6 @@ package struct AppBootstrap {
     )
 
     @Inject let config: ServerConfig
-
 
     /// The **pre-step**: runs before `Wire.bootstrap`, and its return value is the graph's `inputs:`.
     ///
