@@ -91,6 +91,13 @@ let package = Package(
             dependencies: [
                 "HummingbirdExample",
                 .product(name: "HummingbirdTesting", package: "hummingbird"),
+                // The ambient-context probe registers a route through `Router: ServerTransport` and wraps
+                // it in real Hummingbird middleware. `OpenAPIRuntime` (for `HTTPBody`) is not named here
+                // because this package does not depend on it directly — it arrives with
+                // swift-openapi-hummingbird, and adding it would mean pinning a version this example has
+                // no other reason to constrain.
+                .product(name: "Hummingbird", package: "hummingbird"),
+                .product(name: "OpenAPIHummingbird", package: "swift-openapi-hummingbird"),
                 .product(name: "Controllers", package: "Controllers"),
                 .product(name: "HTMLForm", package: "HTMLForm"),
                 .product(name: "YAMLConfig", package: "YAMLConfig"),
