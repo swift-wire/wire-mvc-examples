@@ -84,6 +84,10 @@ let package = Package(
             dependencies: [
                 "VaporExample",
                 .product(name: "VaporTesting", package: "vapor"),
+                // The ambient-context probe registers a route through `VaporTransport` and wraps it in
+                // real Vapor middleware.
+                .product(name: "Vapor", package: "vapor"),
+                .product(name: "OpenAPIVapor", package: "swift-openapi-vapor"),
                 .product(name: "Controllers", package: "Controllers"),
                 .product(name: "HTMLForm", package: "HTMLForm"),
                 .product(name: "YAMLConfig", package: "YAMLConfig"),
