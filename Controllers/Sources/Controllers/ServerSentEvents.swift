@@ -1,8 +1,7 @@
 public import AsyncStreaming
+import BasicContainers
 public import HTTPTypes
 public import WireMVC
-
-import BasicContainers
 
 // Server-sent events as a **response mode**, declared entirely outside WireMVC — the third instance of the
 // codec extension point, after `@FormBody`/`@YAMLResponse`, and the first on the *streaming* tier.
