@@ -92,8 +92,8 @@ struct TodosRoutingTests {
             #expect(fetched.status == 200)
             #expect(try fetched.json(Todo.self) == created)
 
-            // GET /export — @RawRoute(.responseSender) with a sender-transforming middleware: streams the todos
-            // as a multipart/mixed body, one part per todo.
+            // GET /export — @MultiPartResponse on the streaming producer tier: the handler returns parts and
+            // MultiPartProducer frames them as a multipart/mixed body, one part per todo.
             let export = try await client.get("/export")
             #expect(export.status == 200)
             let exportText = export.bodyText
@@ -101,6 +101,22 @@ struct TodosRoutingTests {
                 exportText.contains("--wireboundary") && exportText.contains("Content-Type: application/json")
                     && exportText.contains("name=\"\(created.id)\"") && exportText.contains(created.title)
                     && exportText.contains("completed") && exportText.contains("--wireboundary--")
+            )
+            // The boundary-bearing content type comes from the producer, not from hand-built HTTPFields —
+            // which is the part of the raw handler the tier took over.
+            #expect(export.head?.headerFields[.contentType] == "multipart/mixed; boundary=wireboundary")
+
+            // GET /export/raw — the same body through the *other* tier: a @RawRoute(.responseSender) handler
+            // receiving a sender a middleware transformed. Asserted byte-identical to the producer's output,
+            // which is the claim the two-route split rests on — they differ in how the response is produced,
+            // not in what it is.
+            let exportRaw = try await client.get("/export/raw")
+            #expect(exportRaw.status == 200)
+            let rawText = exportRaw.bodyText
+            #expect(
+                rawText.contains("--wireboundary") && rawText.contains("Content-Type: application/json")
+                    && rawText.contains("name=\"\(created.id)\"") && rawText.contains(created.title)
+                    && rawText.contains("--wireboundary--")
             )
 
             // GET /todos/{missing} — the handler throws TodoNotFound; @ErrorResponse maps it to 404.

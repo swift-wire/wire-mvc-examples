@@ -84,10 +84,11 @@ struct MockedRoutingTests {
         verify(todoMock, times: 1).all()
     }
 
-    /// `GET /export` — the app-scoped generic `ExportController<Repository>`, `@TestScopable`, whose route is a
-    /// `@RawRoute` streaming a `multipart/mixed` body. Under the keyed suite it's rebuilt per request with the
-    /// mock; the raw handler calls `repository.all()` and streams each todo. Proves the **raw-route** variant
-    /// witness enters seedless scope with the mock (the reconstructed subject, not a held `_wireSubject`).
+    /// `GET /export/raw` — the app-scoped generic `ExportController<Repository>`, `@TestScopable`, whose
+    /// route is a `@RawRoute` streaming a `multipart/mixed` body through a sender-transforming middleware.
+    /// Under the keyed suite it's rebuilt per request with the mock; the raw handler calls
+    /// `repository.all()` and streams each todo. Proves the **raw-route** variant witness enters seedless
+    /// scope with the mock (the reconstructed subject, not a held `_wireSubject`).
     @Test func exportRawRouteThreadsMockThroughAppScopedController() async throws {
         var todoExpectations = MockMockableTodoRepository.Expectations()
         when(todoExpectations.all(), return: [Todo(id: "7", title: "streamed", completed: true)])
@@ -96,10 +97,31 @@ struct MockedRoutingTests {
         try await withClient(supplying: ExportControllerDoubles(todoRepository: todoMock)) { export in
             // The raw-route shim: the request line is derived, the payload stays untyped, and a non-2xx is not
             // treated as a failure — a raw route may answer one by design.
-            try await export.todos { response, _ in
+            try await export.todosRaw { response, _ in
                 #expect(response.status == .ok)
             }
         }
         verify(todoMock, times: 1).all()  // the raw handler reached the mock through the rebuilt controller
+    }
+
+    /// `GET /export` — the same controller's **producer-tier** route. The variant witness has to reconstruct
+    /// the subject for a streaming terminal too, which is a different generated shape from the raw route
+    /// above, and nothing else exercises it under a keyed suite.
+    ///
+    /// It also asserts the *body*, which the raw shim cannot: a `client: .text` mode hands back the
+    /// undecoded response, so the mock's todo is visible in the framing the producer wrote.
+    @Test func exportProducerRouteThreadsMockThroughAppScopedController() async throws {
+        var todoExpectations = MockMockableTodoRepository.Expectations()
+        when(todoExpectations.all(), return: [Todo(id: "7", title: "streamed", completed: true)])
+        let todoMock = MockMockableTodoRepository(expectations: todoExpectations)
+
+        try await withClient(supplying: ExportControllerDoubles(todoRepository: todoMock)) { export in
+            let body = try await export.todos()
+            #expect(body.contains("--wireboundary"))
+            #expect(body.contains(#"name="7""#))
+            #expect(body.contains("streamed"))
+            #expect(body.hasSuffix("--wireboundary--\r\n"))
+        }
+        verify(todoMock, times: 1).all()
     }
 }

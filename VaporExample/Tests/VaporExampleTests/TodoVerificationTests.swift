@@ -96,9 +96,9 @@ struct TodoVerificationTests {
             #expect(got.status == .ok)
             #expect(try decode(Todo.self, got) == todo)
 
-            // GET /export — @RawRoute(.responseSender) with a sender-transforming middleware (M5.4R), here
-            // through the ServerTransport adapter: the handler receives a MultiPartSender<S> and streams the
-            // todos as a multipart/mixed body, one part per todo, through a MultiPartWriter.
+            // GET /export — @MultiPartResponse on the streaming producer tier, here through the
+            // ServerTransport adapter: the handler returns parts and MultiPartProducer frames them as a
+            // multipart/mixed body, one part per todo.
             let exported = try await execute(.GET, "/export")
             let exportText = String(buffer: exported.body)
             #expect(
@@ -107,6 +107,19 @@ struct TodoVerificationTests {
                     && exportText.contains("name=\"\(todo.id)\"") && exportText.contains(todo.title)
                     && exportText.contains("completed")  // the whole Todo is JSON-encoded, not just the title
                     && exportText.contains("--wireboundary--")
+            )
+
+            // GET /export/raw — the same body through the raw tier: @RawRoute(.responseSender) receiving a
+            // MultiPartSender<S> from a sender-transforming middleware. Kept because this is the only
+            // running proof that a box-transforming middleware survives the ServerTransport bridge, which
+            // moving /export off the raw tier would otherwise have taken with it.
+            let exportedRaw = try await execute(.GET, "/export/raw")
+            #expect(exportedRaw.status == .ok)
+            let rawText = String(buffer: exportedRaw.body)
+            #expect(
+                rawText.contains("--wireboundary") && rawText.contains("Content-Type: application/json")
+                    && rawText.contains("name=\"\(todo.id)\"") && rawText.contains(todo.title)
+                    && rawText.contains("--wireboundary--")
             )
 
             // get by @Path id, missing — the handler throws TodoNotFound; @ErrorResponse maps it to 404
