@@ -31,6 +31,20 @@ controllers are pulled in by a **path dependency**, so each runtime compiles the
 controller source — that's what makes it a genuine cross-runtime proof rather than a re-implementation.
 The same goes for `OpenAPISpec`: one document, one `@OpenAPIController`, three runtimes.
 
+## Where the runtimes diverge
+
+The identical controller source is the claim; identical *behaviour* is not, and the differences are
+measured here rather than assumed. Each runtime's suite pins what its host's router does with a wrong
+method and with a percent-escaped path parameter — see `MethodMismatchTests` and
+`PathParameterDecodingTests` in each of the three.
+
+The matrix, with what is convention and what is a capability gap, is in
+[wire-mvc's README](https://github.com/tachyonics/wire-mvc#what-differs-by-runtime). The short version:
+Hummingbird and Vapor answer `404` where the native router answers `405`, Hummingbird does not
+percent-decode path parameters, and a **catch-all route serves on the native runtime only** — which is why
+`SwiftHttpServerExample` owns `AssetsController` instead of `Controllers` doing so. A catch-all controller
+in the shared package would break the other two executables at startup.
+
 ## What each example demonstrates
 
 - **Both authoring styles, one routing model.** Every runtime serves `/todos` from `@Get`/`@Post`
