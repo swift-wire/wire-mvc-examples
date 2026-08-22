@@ -1,11 +1,10 @@
 package import Wire
 package import WireMVC
 
-#if canImport(FoundationEssentials)
-import FoundationEssentials
-#else
+// Full Foundation, not the `canImport(FoundationEssentials)` guard used elsewhere in this package:
+// `removingPercentEncoding` is not in FoundationEssentials, so the guard resolves to the lighter module
+// on Linux and the API is absent — which compiles on macOS and fails in CI.
 import Foundation
-#endif
 
 // A **catch-all** route — `@Get("/{path*}")` — and the only controller in this repo that lives in a
 // runtime's own package rather than in the shared `Controllers` library.
