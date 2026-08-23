@@ -1,5 +1,5 @@
 import AsyncHTTPClient
-import HTTPTypes
+package import HTTPTypes
 package import Wire
 package import WireConfiguration
 

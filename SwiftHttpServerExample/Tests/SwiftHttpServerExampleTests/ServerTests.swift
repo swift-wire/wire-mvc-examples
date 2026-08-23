@@ -2,6 +2,7 @@ import ContainerMacrosLib
 import ContainerTestSupport
 import Controllers
 import Foundation
+import HTTPTypes
 import LocalContainers
 import Synchronization  // the LogRequests observe-middleware counter
 import Testing
