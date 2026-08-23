@@ -1,0 +1,4 @@
+# Response validation is on for this document. It is a per-document setting, and a build-time one:
+# turning it on widens the build-time checks to response schemas, so a constraint the adapter cannot
+# express fails the build only for someone who actually asked for the check.
+validatesResponses: true

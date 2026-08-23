@@ -34,6 +34,14 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateTodo'
       responses:
+        # Declared so a rejected request is answered as one of this operation's *own* responses, rather
+        # than by the runtime's default. A mapped error has to name a status the document describes.
+        '422':
+          description: The request does not satisfy the document.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
         '201':
           description: The created todo.
           content:
@@ -69,6 +77,12 @@ paths:
             schema:
               $ref: '#/components/schemas/EditTodo'
       responses:
+        '422':
+          description: The request does not satisfy the document.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
         '200':
           description: The updated todo.
           content:
@@ -97,8 +111,17 @@ components:
       name: id
       in: path
       required: true
+      # An assertion the generator drops: it emits `Swift.String` and enforces nothing. The generated
+      # validator checks it before the handler runs. A *parameter* violation answers 400, where a body
+      # one answers 422 — the split `WireMVCBindingError` already draws for a `@Get` route.
+      #
+      # The character class has to admit what every backend here actually mints: Valkey hands out a
+      # counter (`1`, `2`), while CouchDB and MongoDB use `UUID().uuidString`, which Swift renders in
+      # **upper** case. A lowercase-only pattern passed on Valkey and rejected every id on the other two,
+      # which is the sort of thing only running all three finds.
       schema:
         type: string
+        pattern: '^[A-Za-z0-9-]+$'
   schemas:
     Todo:
       type: object
@@ -106,8 +129,14 @@ components:
       properties:
         id:
           type: string
+        # `Todo` is only ever a *response* here — `CreateTodo` and `EditTodo` are what callers send — so
+        # these bounds are checked only because `wire-openapi.yaml` turns response validation on. A
+        # handler returning something outside them has broken its own contract: 500, and no body, because
+        # the caller did nothing wrong and can do nothing about it.
         title:
           type: string
+          minLength: 1
+          maxLength: 80
         completed:
           type: boolean
     CreateTodo:
@@ -116,11 +145,15 @@ components:
       properties:
         title:
           type: string
+          minLength: 1
+          maxLength: 80
     EditTodo:
       type: object
       properties:
         title:
           type: string
+          minLength: 1
+          maxLength: 80
         completed:
           type: boolean
     Problem:

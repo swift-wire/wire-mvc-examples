@@ -170,6 +170,21 @@ struct TodoVerificationTests {
             let readBack = try await execute(.GET, "/todos/\(specTodo.id)")
             #expect(try decode(Todo.self, readBack).title == "via the document")
 
+            // Assertions the *document* makes and the generator drops, now enforced. Three shapes, three
+            // answers, none of them written by a handler: a body a generated check refused, a body the
+            // *deserializer* refused (which never reached the forwarder, and used to be a bare 400 with
+            // no body), and a parameter violation — 400 rather than 422, because the request line is
+            // wrong and not the payload, which is the split `WireMVCBindingError` already draws.
+            let emptyTitle = try await execute(.POST, "/api/todos", json: true, body: #"{"title":""}"#)
+            #expect(emptyTitle.status == .unprocessableEntity)
+            #expect(emptyTitle.body.string.contains("invalid: body.title"))
+            let missingTitle = try await execute(.POST, "/api/todos", json: true, body: "{}")
+            #expect(missingTitle.status == .unprocessableEntity)
+            #expect(missingTitle.body.string.contains("body.title"))
+            let badID = try await execute(.GET, "/api/todos/NOT_LOWERCASE")
+            #expect(badID.status == .badRequest)
+            #expect(badID.body.string.contains("path.id"))
+
             // @ErrorResponse at operation scope, carrying the body the document declares for its 404 —
             // the annotation-driven `/todos/does-not-exist` above answers 404 too. One error model.
             let missingViaSpec = try await execute(.GET, "/api/todos/does-not-exist")

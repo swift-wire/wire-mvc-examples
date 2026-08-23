@@ -184,6 +184,39 @@ struct TodoVerificationTests {
             #expect(missingViaSpec.status == .notFound)
             #expect(String(buffer: missingViaSpec.body).contains("no such todo"))
 
+            // Assertions the *document* makes and the generator drops, now enforced. Three shapes, three
+            // answers, none of them written by a handler.
+            //
+            // A body the generated check refused: `title` is bounded at 1, and the operation maps the
+            // failure to the 422 its document declares, so the answer is one of its own responses.
+            let emptyTitle = try await client.execute(
+                uri: "/api/todos",
+                method: .post,
+                headers: [.contentType: "application/json"],
+                body: ByteBuffer(string: #"{"title":""}"#)
+            )
+            #expect(emptyTitle.status == .unprocessableContent)
+            #expect(String(buffer: emptyTitle.body).contains("invalid: body.title"))
+
+            // A body the *deserializer* refused, which never reached the forwarder at all — `title` is
+            // required and absent. The same mapping answers it, because both arrive as the same error.
+            // Before that conversion this was a bare 400 with an empty body.
+            let missingTitle = try await client.execute(
+                uri: "/api/todos",
+                method: .post,
+                headers: [.contentType: "application/json"],
+                body: ByteBuffer(string: #"{}"#)
+            )
+            #expect(missingTitle.status == .unprocessableContent)
+            #expect(String(buffer: missingTitle.body).contains("body.title"))
+
+            // A *parameter* violation, which answers 400 rather than 422 — the request line is wrong, not
+            // the payload, and that is the split `WireMVCBindingError` already draws for a `@Get` route.
+            // Nothing maps it, so this is the unmapped default naming the field it refused.
+            let badID = try await client.execute(uri: "/api/todos/NOT_LOWERCASE", method: .get)
+            #expect(badID.status == .badRequest)
+            #expect(String(buffer: badID.body).contains("path.id"))
+
             // Cleanup, through the document's own delete (204, from @ResponseStatus).
             let deletedViaSpec = try await client.execute(
                 uri: "/api/todos/\(specTodo.id)",
