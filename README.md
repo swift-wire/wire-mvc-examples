@@ -62,6 +62,25 @@ in the shared package would break the other two executables at startup.
   rather than part of it: it depends on a code generator (on a fork, pinned to a revision until upstream
   takes the access-modifier change), and `Controllers` stays lean — WireMVC + Wire and nothing else — so
   a runtime can take the controllers without inheriting any of that.
+- **The document enforced, not just translated.** swift-openapi-generator turns a schema's *structure*
+  into types and drops every *assertion* — `minLength`, `pattern`, `maxItems` — so a document can say
+  `minLength: 1` and nothing check it. `OpenAPISpec` now declares assertions and WireOpenAPI generates
+  the checks, before the handler is entered. Nothing in `TodosOperations` checks a title.
+
+  Three answers, and which one you get is the document's decision rather than a handler's. A **body**
+  violation is 422 and a **parameter** violation is 400 — the split `WireMVCBindingError` already draws
+  for a `@Get` route, so both authoring styles answer alike. A body the *deserializer* refused outright
+  (`title` missing, so the forwarder is never entered) arrives as the same error as one a generated
+  check refused, which is why `createTodo` needs only one `@ErrorResponse` to cover both; unmapped, it
+  would answer 422 naming the field rather than a bare 400 with no body.
+
+  `wire-openapi.yaml` beside the document turns on **response** validation, which is off by default —
+  a contract-violating 200 becoming a 500 is a runtime behaviour change worth asking for. It is a file
+  of the adapter's rather than a key in `openapi-generator-config.yaml`, because that config rejects
+  unknown keys outright. `Todo` is only ever a response here, so its bounds are checked only because
+  this document opted in; `CreateTodo` is only ever a request. The two sides are separate errors on
+  purpose — a bad request is the caller's fault and says which field, a bad response is the service's
+  and says nothing, because the caller can do nothing about it.
 - **Cross-runtime portability.** The controllers (`@Singleton @Controller` todos CRUD) in
   `Controllers/` are byte-identical across every executable. Only the *assembly* differs: each app
   builds its runtime's router and registers the collated routes onto it — `WireMVCServerTransport.apply`

@@ -36,6 +36,19 @@ public struct TodosOperations<Repository: TodoRepository>: Sendable {
         )
     }
 
+    /// Nothing in this method checks the title, and nothing needs to. The document says a title is
+    /// between 1 and 80 characters, and the generated validator enforces that before the handler is
+    /// entered — including for a body the *deserializer* refused outright, such as one missing `title`
+    /// altogether, which never reaches here at all. One mapping answers both, because both arrive as the
+    /// same error.
+    ///
+    /// The three-argument form again, and again because the document forces it: the `422` declared for
+    /// this operation carries a `Problem`, which a bare status cannot construct.
+    @ErrorResponse(
+        WireOpenAPIRequestValidationError.self,
+        .unprocessableContent,
+        { error in Schemas.Problem(message: "invalid: \(error.failures.map(\.path).joined(separator: ", "))") }
+    )
     @Operation
     public func createTodo(@JSONBody input: Schemas.CreateTodo) async throws -> Schemas.Todo {
         .init(try await repository.create(CreateTodo(title: input.title)))
@@ -61,6 +74,11 @@ public struct TodosOperations<Repository: TodoRepository>: Sendable {
         TodoNotFound.self,
         .notFound,
         { _ in Schemas.Problem(message: "no such todo") }
+    )
+    @ErrorResponse(
+        WireOpenAPIRequestValidationError.self,
+        .unprocessableContent,
+        { error in Schemas.Problem(message: "invalid: \(error.failures.map(\.path).joined(separator: ", "))") }
     )
     @Operation
     public func editTodo(

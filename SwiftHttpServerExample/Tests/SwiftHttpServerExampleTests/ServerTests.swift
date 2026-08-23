@@ -184,6 +184,21 @@ struct TodosRoutingTests {
             let specTodo = try createdViaSpec.json(Todo.self)
             #expect(try await client.get("/todos/\(specTodo.id)").json(Todo.self).title == "via the document")
 
+            // Assertions the *document* makes and the generator drops, now enforced. Three shapes, three
+            // answers, none of them written by a handler: a body a generated check refused, a body the
+            // *deserializer* refused (which never reached the forwarder, and used to be a bare 400 with
+            // no body), and a parameter violation — 400 rather than 422, because the request line is
+            // wrong and not the payload, which is the split `WireMVCBindingError` already draws.
+            let emptyTitle = try await client.post("/api/todos", json: ["title": ""])
+            #expect(emptyTitle.status == 422)
+            #expect(emptyTitle.bodyText.contains("invalid: body.title"))
+            let missingTitle = try await client.post("/api/todos", json: [String: String]())
+            #expect(missingTitle.status == 422)
+            #expect(missingTitle.bodyText.contains("body.title"))
+            let badID = try await client.get("/api/todos/NOT_LOWERCASE")
+            #expect(badID.status == 400)
+            #expect(badID.bodyText.contains("path.id"))
+
             // @ErrorResponse at operation scope, carrying the body the document declares for its 404.
             let missingViaSpec = try await client.get("/api/todos/does-not-exist")
             #expect(missingViaSpec.status == 404)
