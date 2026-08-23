@@ -1,4 +1,5 @@
 import Controllers
+import HTTPTypes
 import Smockable
 import Testing
 import WireMVCTesting

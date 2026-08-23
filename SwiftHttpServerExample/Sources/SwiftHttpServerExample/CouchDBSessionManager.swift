@@ -1,4 +1,5 @@
 package import Controllers
+import HTTPTypes
 package import Wire
 
 #if canImport(FoundationEssentials)
