@@ -1,6 +1,6 @@
 import Foundation
-package import HTMLForm
-package import HTTPTypes
+import HTMLForm
+import HTTPTypes
 import Testing
 import WireMVCTesting
 

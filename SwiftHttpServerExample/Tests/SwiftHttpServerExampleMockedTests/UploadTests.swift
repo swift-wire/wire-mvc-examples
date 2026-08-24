@@ -1,4 +1,4 @@
-package import Controllers
+import Controllers
 import Foundation
 import Testing
 import WireMVCTesting
