@@ -83,6 +83,18 @@ in the shared package would break the other two executables at startup.
   differently-shaped box. Without an `x-api-key` header the gate *handles the request itself* — writes a
   401, and the route handler is skipped — while the controller-scope middleware still runs (every
   middleware runs; the "decision" is state carried in the box, not a control-flow short-circuit).
+- **The global tier, and a middleware that answers over the fallback.** `SwiftHttpServerExample`'s
+  composition root carries two `@Middleware` entries that wrap *every* request — matched routes and the
+  `@NotFound` fallback alike, because the generated `@main` folds them around the finalized router.
+  `CORSMiddleware` *contributes* header fields and answers only preflights; `ServeStaticFiles` answers
+  `GET`/`HEAD` under `/static/` itself, from outside the router, for paths no route is registered at — and
+  **declines** everything else, so the app's authored `@NotFound` gets its turn. Two properties fall out and
+  are pinned by `StaticFileServingTests`: the middleware must be prefix-scoped, because the front layer runs
+  before the router and cannot ask whether a route would have matched; and it must answer via
+  `respondingWith` rather than raw `responding`, or CORS's contributed fields are dropped on exactly the
+  responses a browser fetches most. Native-runtime only — Hummingbird and Vapor mount onto the host's own
+  `Application`, so there is no generated `@main`, no global tier, and the host's file middleware holds this
+  position instead.
 - **Error mapping, one model across both authoring styles.** `TodosController` declares
   `@ErrorResponse(TodoNotFound.self, .notFound)`, so a handler *throw* becomes a 404 rather than the
   baseline 500 — and `TodosOperations` maps the same domain error at operation scope, where the document

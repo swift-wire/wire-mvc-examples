@@ -56,13 +56,89 @@ Streaming request bodies were *not* part of that ceiling — see the first work 
    being read after the route closure has returned a *streaming* response. The bridge's own suite pins it,
    but no example route does both at once (`/todos/stream` and `/export` are GETs), so neither framework's
    channel semantics have been exercised. Answering that is step 1 of the streaming track below.
-2. **File serving / s3-file-provider.** A global `@Middleware` that answers the request itself over the
-   `@NotFound` fallback — the box's `.responded` state (`wire-mvc/Sources/WireMVC/Middleware.swift:5-20`)
-   plus the front layer wrapping every route including the fallback
-   (`wire-mvc/Sources/WireMVCCodegen/BootstrapGeneration.swift:85-87`). Nothing in the repo exercises
-   that seam end-to-end. Native-path only: on the ServerTransport runtimes the host's own file
-   middleware does this, which is the honest story for a framework that collates rather than owns the
-   router.
+2. ~~**File serving / s3-file-provider**~~ — **done**, and worth restating as what it was always about:
+   *a global `@Middleware` that answers the request itself over the `@NotFound` fallback*. "File serving"
+   reads as done the moment a catch-all route serves a tree, which `AssetsController` (#57) now does — and
+   that is a different seam. A route runs *inside* the router, after a match; this one runs outside it.
+
+   `SwiftHttpServerExample`'s `StaticFileServing.swift` is the seam: `ServeStaticFiles` is a second global
+   `@Middleware` on the composition root, injecting a `StaticFileStore` whose lookup is `async` because the
+   example it stands in for is S3. It answers `GET`/`HEAD` under `/static/` — the box's `.responded` state
+   (`wire-mvc/Sources/WireMVC/Middleware.swift:5-20`) plus the front layer wrapping every route including
+   the fallback (`wire-mvc/Sources/WireMVCCodegen/BootstrapGeneration.swift:85-87`) — and **declines**
+   everything else, which is the half that needed a counterpart: the app now authors a `@NotFound` with a
+   `NoRoute` body, so `StaticFileServingTests` can assert *which* layer answered rather than only that a
+   `404` came back. Native-path only, as stated: on the ServerTransport runtimes there is no generated
+   `@main` and therefore no global tier at all, and the host's own file middleware holds this position.
+
+   Two things the implementation settled that the item did not anticipate:
+
+   - **The middleware has to be prefix-scoped, and that is structural.** The front layer runs *before* the
+     router and cannot ask whether a route would have matched — by the time it could, the chain is already
+     inside `inner.handle`. An unscoped file middleware would therefore shadow every route in the app.
+     Hummingbird's `FileMiddleware` sits the other way round, running after the router declines; WireMVC's
+     global tier has no such position, so a prefix is what stands in for one.
+   - **`respondingWith`, not `responding`.** Raw `responding` hands over the sender and WireMVC never sees
+     an outcome, so it cannot drain the response-header registry: CORS is the outer global middleware and
+     has already *contributed* `Access-Control-Allow-Origin` by then, and it would be dropped on precisely
+     the responses a browser fetches most. Pinned by `corsFieldsSurviveAFileAnsweredHere`.
+
+   **One framework finding on the way**, and it turned out to be upstream rather than in wire-mvc. A
+   `@RawRoute` cannot declare its response sender `consuming sending Sender` when the sender is the
+   **untransformed** one — which is every raw route not sitting behind a sender-transforming middleware,
+   and *always* a `@NotFound`, since `registerNotFound` folds no middleware and so can never be handed a
+   transformed sender. `consuming Sender` compiles, and is what this app declares.
+
+   Measured by compiling each case against this app rather than reasoned about, because every step of the
+   reasoning turned out to be wrong at least once:
+
+   | slot | codegen passes | `sending` |
+   |---|---|---|
+   | reader | `reader` verbatim | compiles — including through a middleware fold |
+   | transformed sender (`MultiPartSender<S>`) | `responseSender` verbatim | compiles |
+   | untransformed sender | `ResponseHeaderApplyingSender(wrapping:registry:)` | region-isolation error |
+
+   **The cause is provenance, not the wrap and not aliasing.** Regions permit aliasing *within* a region;
+   what decides the region is where a value came from. The proposal's `HTTPServerRequestHandler.handle`
+   (`swift-http-api-proposal/Sources/HTTPAPIs/Server/HTTPServerRequestHandler.swift:85-90`) declares
+   `reader` and `responseSender` as `consuming sending` but `requestContext` as plain `consuming`. So the
+   `ResponseHeaderRegistry` — which travels inside the context, because `handle` takes exactly four values
+   and the context is the only extension point among them — is task-isolated, and merging it into the
+   wrapper taints a composite that was otherwise disconnected. The reader is untouched because nothing is
+   merged into it, which is why it takes `sending` today and the sender does not.
+
+   Three ways out, in ascending cost:
+
+   - **One word upstream:** `requestContext: consuming sending RequestContext`. Modelled the shape in
+     isolation and changed nothing else — the same code compiles. It asks the server to promise it retains
+     no reference to the context it hands over, which is the proposal's invariant to state, not ours.
+   - **In-house, no upstream dependency:** make `ResponseHeaderRegistry` `~Copyable` and carry it in
+     `WireDisconnected` inside `WireMVCContext`, giving it the treatment the reader and sender already get
+     (`WireDisconnected` is `Sendable` and opts its contents out of region tracking, which is exactly why
+     a task-isolated box can still hand out `sending` reader and sender). `WireDisconnected` *alone*, with
+     the registry left a class, compiles and is **unsound** — the type's documented precondition is that
+     the stored value is never aliased, which holds for linear reader/sender by construction and not for a
+     class reference. Linearity is what restores it, and it costs a redesign — broken into seven steps by
+     wire-mvc's
+     [`LinearResponseHeaderRegistry.md`](https://github.com/tachyonics/wire-mvc/blob/main/Documentation/Notes/LinearResponseHeaderRegistry.md),
+     which also records the acceptance test that does not exist today. One of the steps is a public break:
+     middleware write via `input.responseHeaders.add(…)`, which works only because a class reference
+     mutates through a borrow, so every such call site moves — `ServeStaticFiles` in this repo among
+     them.
+   - **Make the registry `Sendable`** — a `Mutex` plus `@Sendable` on the `onSend` closures, which
+     constrains what a middleware may capture to compute a deferred contribution. That overturns a
+     decision the type documents deliberately ("one request's registry is written by that request's
+     middleware and drained by its terminal, all in one region").
+
+   Two smaller things this turned up, both in wire-mvc. The codegen test
+   `notFoundHandlerRegistersAsFallback` spells its fixture `consuming sending Sender`; it asserts on
+   rendered source, so nothing there compiles it — it is the only place in either repo advertising a
+   spelling that cannot work, and wants correcting. (The wrapped path itself *is* compiled, by
+   `Fixtures/Sources/WireMVCBootstrapExample` and `WireMVCExample`, both of which use the working
+   spelling.) And two comments — `Fixtures/Sources/WireMVCExample/UsersController.swift:58-62` and
+   `WireMVCOutcome.send(on:)` — state the rule correctly but attribute it to the middleware fold handing
+   the sender out as "a plain `consuming` value", where both box destructures in fact declare `consuming
+   sending`. The rule is right; the reason given for it is not.
 3. **jobs.** A job queue as a graph-hosted `ServiceLifecycle` service plus a route that enqueues.
    Nothing currently shows work outliving the request.
 4. **auth-abac / auth-permissions.** Policy objects as bindings, composed by route-scope middleware.
