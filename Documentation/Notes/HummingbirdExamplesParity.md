@@ -83,62 +83,60 @@ Streaming request bodies were *not* part of that ceiling — see the first work 
      has already *contributed* `Access-Control-Allow-Origin` by then, and it would be dropped on precisely
      the responses a browser fetches most. Pinned by `corsFieldsSurviveAFileAnsweredHere`.
 
-   **One framework finding on the way**, and it turned out to be upstream rather than in wire-mvc. A
-   `@RawRoute` cannot declare its response sender `consuming sending Sender` when the sender is the
-   **untransformed** one — which is every raw route not sitting behind a sender-transforming middleware,
-   and *always* a `@NotFound`, since `registerNotFound` folds no middleware and so can never be handed a
-   transformed sender. `consuming Sender` compiles, and is what this app declares.
+   **One framework finding on the way — since fixed, in-house.** A `@RawRoute` could not declare its
+   response sender `consuming sending Sender` when the sender was the **untransformed** one, which is
+   every raw route not sitting behind a sender-transforming middleware and *always* a `@NotFound`, since
+   `registerNotFound` folds no middleware and so can never be handed a transformed sender. `noRoute` in
+   `SwiftHttpServerExample` now declares `consuming sending Sender`, and compiles.
 
    Measured by compiling each case against this app rather than reasoned about, because every step of the
    reasoning turned out to be wrong at least once:
 
-   | slot | codegen passes | `sending` |
-   |---|---|---|
-   | reader | `reader` verbatim | compiles — including through a middleware fold |
-   | transformed sender (`MultiPartSender<S>`) | `responseSender` verbatim | compiles |
-   | untransformed sender | `ResponseHeaderApplyingSender(wrapping:registry:)` | region-isolation error |
+   | slot | codegen passes | `sending`, before | after |
+   |---|---|---|---|
+   | reader | `reader` verbatim | compiles — including through a fold | unchanged |
+   | transformed sender (`MultiPartSender<S>`) | `responseSender` verbatim | compiles | unchanged |
+   | untransformed sender | `ResponseHeaderApplyingSender(wrapping:registry:)` | region-isolation error | **compiles** |
 
-   **The cause is provenance, not the wrap and not aliasing.** Regions permit aliasing *within* a region;
+   **The cause was provenance, not the wrap and not aliasing.** Regions permit aliasing *within* a region;
    what decides the region is where a value came from. The proposal's `HTTPServerRequestHandler.handle`
-   (`swift-http-api-proposal/Sources/HTTPAPIs/Server/HTTPServerRequestHandler.swift:85-90`) declares
-   `reader` and `responseSender` as `consuming sending` but `requestContext` as plain `consuming`. So the
-   `ResponseHeaderRegistry` — which travels inside the context, because `handle` takes exactly four values
-   and the context is the only extension point among them — is task-isolated, and merging it into the
-   wrapper taints a composite that was otherwise disconnected. The reader is untouched because nothing is
-   merged into it, which is why it takes `sending` today and the sender does not.
+   declares `reader` and `responseSender` as `consuming sending` but `requestContext` as plain
+   `consuming`. So the `ResponseHeaderRegistry` — which travels inside the context, because `handle` takes
+   exactly four values and the context is the only extension point among them — was task-isolated, and
+   merging it into the wrapper tainted a composite that was otherwise disconnected. The reader was
+   untouched because nothing is merged into it, which is why it took `sending` even then.
 
-   Three ways out, in ascending cost:
+   **The in-house route was taken**, not the one-word-upstream one: `requestContext: consuming sending
+   RequestContext` was never declined, because it was never asked — the API break was affordable while
+   there are no consumers, and the in-house fix turned out to pay for itself. `ResponseHeaderRegistry` is
+   now a `~Copyable` struct carried in `WireDisconnected` inside `WireMVCContext`, which is the treatment
+   the reader and sender already got. Linearity is the load-bearing half: `WireDisconnected` alone, with
+   the registry left a class, compiles and is **unsound**, since that type's precondition is that the
+   stored value is never aliased — true of a linear reader or sender by construction, false of a class
+   reference. wire-mvc's
+   [`LinearResponseHeaderRegistry.md`](https://github.com/tachyonics/wire-mvc/blob/main/Documentation/Notes/LinearResponseHeaderRegistry.md)
+   records the design, the four places the plan turned out to be wrong, and the measurement: **six
+   allocations and 1536 bytes per request**, on a case where the registry genuinely escapes.
 
-   - **One word upstream:** `requestContext: consuming sending RequestContext`. Modelled the shape in
-     isolation and changed nothing else — the same code compiles. It asks the server to promise it retains
-     no reference to the context it hands over, which is the proposal's invariant to state, not ours.
-   - **In-house, no upstream dependency:** make `ResponseHeaderRegistry` `~Copyable` and carry it in
-     `WireDisconnected` inside `WireMVCContext`, giving it the treatment the reader and sender already get
-     (`WireDisconnected` is `Sendable` and opts its contents out of region tracking, which is exactly why
-     a task-isolated box can still hand out `sending` reader and sender). `WireDisconnected` *alone*, with
-     the registry left a class, compiles and is **unsound** — the type's documented precondition is that
-     the stored value is never aliased, which holds for linear reader/sender by construction and not for a
-     class reference. Linearity is what restores it, and it costs a redesign — broken into seven steps by
-     wire-mvc's
-     [`LinearResponseHeaderRegistry.md`](https://github.com/tachyonics/wire-mvc/blob/main/Documentation/Notes/LinearResponseHeaderRegistry.md),
-     which also records the acceptance test that does not exist today. One of the steps is a public break:
-     middleware write via `input.responseHeaders.add(…)`, which works only because a class reference
-     mutates through a borrow, so every such call site moves — `ServeStaticFiles` in this repo among
-     them.
-   - **Make the registry `Sendable`** — a `Mutex` plus `@Sendable` on the `onSend` closures, which
-     constrains what a middleware may capture to compute a deferred contribution. That overturns a
-     decision the type documents deliberately ("one request's registry is written by that request's
-     middleware and drained by its terminal, all in one region").
+   The third option — making the registry `Sendable` with a `Mutex` and `@Sendable` `onSend` closures —
+   was not taken, and the reason is still worth recording: it constrains what a middleware may capture to
+   compute a deferred contribution, overturning a decision the type documents deliberately.
 
-   Two smaller things this turned up, both in wire-mvc. The codegen test
-   `notFoundHandlerRegistersAsFallback` spells its fixture `consuming sending Sender`; it asserts on
-   rendered source, so nothing there compiles it — it is the only place in either repo advertising a
-   spelling that cannot work, and wants correcting. (The wrapped path itself *is* compiled, by
-   `Fixtures/Sources/WireMVCBootstrapExample` and `WireMVCExample`, both of which use the working
-   spelling.) And two comments — `Fixtures/Sources/WireMVCExample/UsersController.swift:58-62` and
-   `WireMVCOutcome.send(on:)` — state the rule correctly but attribute it to the middleware fold handing
-   the sender out as "a plain `consuming` value", where both box destructures in fact declare `consuming
-   sending`. The rule is right; the reason given for it is not.
+   **The public break landed here too.** Middleware wrote `input.responseHeaders.add(…)`, which worked
+   only because a class reference mutates through a borrow; that is now
+   `input.contributing { headers in … } then: { … }`. `ResponseDefaults` and `MultiPartExport` are the two
+   call sites in this repo — `ServeStaticFiles`, named here as a casualty when this was written, never
+   touched the registry at all.
+
+   Two smaller things this turned up, both in wire-mvc, both now closed. The codegen test
+   `notFoundHandlerRegistersAsFallback` spelled its fixture `consuming sending Sender` while asserting
+   only on rendered source, so nothing compiled it — it was the only place in either repo advertising a
+   spelling that could not work. It is now true, and compiled by two fixtures that spell it for real. And
+   two comments — `Fixtures/Sources/WireMVCExample/UsersController.swift` and `WireMVCOutcome.send(on:)` —
+   attributed the rule to the middleware fold handing the sender out as "a plain `consuming` value", where
+   both box destructures in fact declare `consuming sending`. The rule was right; the reason given for it
+   was not, and both now say why plain `consuming` is simply the permissive spelling.
+
 3. **jobs.** A job queue as a graph-hosted `ServiceLifecycle` service plus a route that enqueues.
    Nothing currently shows work outliving the request.
 4. **auth-abac / auth-permissions.** Policy objects as bindings, composed by route-scope middleware.

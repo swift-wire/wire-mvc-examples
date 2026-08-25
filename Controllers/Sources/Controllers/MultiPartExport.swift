@@ -192,12 +192,12 @@ where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields?, Sender.Wr
         input: consuming Input,
         next: (consuming NextInput) async throws -> Return
     ) async throws -> Return {
-        // Read the response-header registry off the box before consuming it, and thread the same one into
-        // the rebuilt box. It is a required parameter precisely so a transforming middleware cannot forget:
-        // dropping it would silently discard every header field contributed upstream of here.
-        let responseHeaders = input.responseHeaders
+        // The registry comes out of the `pending` destructure and is threaded into the rebuilt box. It is a required parameter precisely so a transforming middleware cannot forget: dropping it
+        // would silently discard every header field contributed upstream of here. Taking it from the
+        // destructure rather than off the box beforehand is also what keeps it disconnected — a captured
+        // local would be task-isolated, and the rebuilt box could not then be handed on.
         return try await input.withContents(
-            pending: { request, requestContext, reader, responseSender in
+            pending: { request, requestContext, reader, responseSender, responseHeaders in
                 try await next(
                     .pending(
                         request: request,
@@ -209,7 +209,9 @@ where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields?, Sender.Wr
                 )
             },
             responded: { request in
-                try await next(.responded(request: request, responseHeaders: responseHeaders))
+                // Nothing to thread: a `responded` box carries no registry, because the response is
+                // already written and nothing would ever drain one.
+                try await next(.responded(request: request))
             }
         )
     }
