@@ -1,4 +1,6 @@
 import Controllers
+// `MemberImportVisibility`: this file names `HTTPField.Name` members, so it must import their defining
+// module itself rather than relying on one reaching it transitively.
 import HTTPTypes
 import Smockable
 import Testing

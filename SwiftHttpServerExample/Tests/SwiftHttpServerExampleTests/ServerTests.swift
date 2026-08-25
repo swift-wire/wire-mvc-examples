@@ -2,6 +2,8 @@ import ContainerMacrosLib
 import ContainerTestSupport
 import Controllers
 import Foundation
+// `MemberImportVisibility`: this file names `HTTPField.Name` members, so it must import their defining
+// module itself rather than relying on one reaching it transitively.
 import HTTPTypes
 import LocalContainers
 import Synchronization  // the LogRequests observe-middleware counter

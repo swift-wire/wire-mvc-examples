@@ -115,25 +115,24 @@ package struct AppBootstrap {
     /// Registered via `registerNotFound` *before* `finalize()`, so it is a real route inside the router —
     /// which is precisely why the static middleware, sitting outside the router, gets to answer over it.
     ///
-    /// **`consuming Sender`, not `consuming sending Sender`**, and that is forced rather than chosen. The
-    /// generated registration passes `ResponseHeaderApplyingSender(wrapping: responseSender, …)` — a
-    /// non-`Sendable` value constructed in the closure's own task-isolated region — so a `sending`
-    /// parameter is a region-isolation error at the call site the plugin emits, not here.
+    /// **`consuming sending Sender`**, which is worth spelling here because for a while it could not be.
+    /// The generated registration passes `ResponseHeaderApplyingSender(wrapping: responseSender, …)`, and
+    /// that wrapper holds the `ResponseHeaderRegistry`; the registry travels inside the request context,
+    /// which the proposal's `HTTPServerRequestHandler.handle` takes as plain `consuming` while `reader`
+    /// and `responseSender` are `consuming sending`. So the registry was task-isolated, merging it into an
+    /// otherwise-disconnected sender closed the region, and this parameter had to be plain `consuming` —
+    /// a `@NotFound` being the worst case of it, since `registerNotFound` folds no middleware and its
+    /// sender is therefore always the untransformed, wrapped one.
     ///
-    /// The region is task-isolated for a reason that is neither wire-mvc's nor this app's: the wrapper
-    /// holds the `ResponseHeaderRegistry`, which travels inside the request context, and the proposal's
-    /// `HTTPServerRequestHandler.handle` declares `reader` and `responseSender` `consuming sending` but
-    /// `requestContext` plain `consuming`. A reader therefore takes `sending` here today and a wrapped
-    /// sender cannot. See the parity note for the measurements and the three ways out — the smallest is
-    /// one word upstream.
-    ///
-    /// Nothing is lost meanwhile: `sending` would only buy the ability to hand the sender to an
-    /// unstructured task, which a fallback has no reason to do.
+    /// wire-mvc made the registry a `~Copyable` value carried in `WireDisconnected`, so the wrapper's two
+    /// inputs are both disconnected and the composite survives as `sending`. This declaration is a
+    /// regression guard on that: the exact shape that used to fail, in a real app, and it stops compiling
+    /// if the registry ever stops being linear.
     @NotFound
     @RawRoute
     package func noRoute<Sender: HTTPResponseSender & ~Copyable>(
         request: HTTPRequest,
-        responseSender: consuming Sender
+        responseSender: consuming sending Sender
     ) async throws where Sender.Writer: ~Copyable {
         try await WireMVCOutcome.json(
             NoRoute(unmatched: request.path ?? "", method: request.method.rawValue),

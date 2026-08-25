@@ -1,4 +1,6 @@
 import AsyncHTTPClient
+// `package` because `CouchDBError.status` is a `package` declaration of a type from here — under
+// `InternalImportsByDefault` a plain `import` makes that an error.
 package import HTTPTypes
 package import Wire
 import WireConfiguration

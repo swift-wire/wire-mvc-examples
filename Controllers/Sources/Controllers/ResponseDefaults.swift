@@ -30,13 +30,15 @@ where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields?, Sender.Wr
         input: consuming Input,
         next: (consuming NextInput) async throws -> Return
     ) async throws -> Return {
-        let headers = input.responseHeaders
-        // `.set` — the middleware is authoritative. Telling a browser not to sniff the content type is not
-        // something an individual route should be able to switch off by accident.
-        headers.add(.set(.init("x-content-type-options")!, "nosniff"))
-        // `.setIfAbsent` — a default the middleware is happy to lose. Most of these routes should not be
-        // cached, but a route that knows better says so in its own response and wins.
-        headers.add(.setIfAbsent(.cacheControl, "no-store"))
-        return try await next(input)
+        return try await input.contributing { headers in
+            // `.set` — the middleware is authoritative. Telling a browser not to sniff the content type is
+            // not something an individual route should be able to switch off by accident.
+            headers.add(.set(.init("x-content-type-options")!, "nosniff"))
+            // `.setIfAbsent` — a default the middleware is happy to lose. Most of these routes should not
+            // be cached, but a route that knows better says so in its own response and wins.
+            headers.add(.setIfAbsent(.cacheControl, "no-store"))
+        } then: { input in
+            try await next(input)
+        }
     }
 }
