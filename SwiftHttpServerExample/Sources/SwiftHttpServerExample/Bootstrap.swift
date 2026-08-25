@@ -22,6 +22,12 @@ import WireMVCRouter
 @Singleton
 @WireMVCBootstrap
 @Middleware(CORSMiddlewareKeys.factory)  // global: every route and the fallback alike
+// The second global middleware, and the one that *answers*. Order is declaration order — CORS is folded
+// outside this one — and that is what the file middleware's `respondingWith` depends on: CORS has already
+// contributed `Access-Control-Allow-Origin` to the registry by the time a file response is written, and
+// draining is what carries it onto a response the router never saw. Reversed, a cross-origin fetch of a
+// static file would come back without the field. See `StaticFileServing.swift`.
+@Middleware(GlobalMiddleware.serveStaticFiles)
 package struct AppBootstrap {
     /// The CORS middleware's dependency, resolved from the graph like any other. `.oneOf` with credentials
     /// is the combination worth showing: allowed *because* it names one origin per response, where `.all`
@@ -91,6 +97,49 @@ package struct AppBootstrap {
     // so the generated entry point registers it via `WireMVC.mountIntrospection` before `finalize()`.
     // Returning `nil` would skip it.
     package func mountIntrospectionAt() -> String? { "/wiring" }
+
+    /// The app's own fallback for requests no route matched — the other half of the static-file seam.
+    ///
+    /// Without this the plugin synthesises a plain bodiless `404`, which is what most apps get and is
+    /// indistinguishable from a route's own mapped `404`. Authoring one gives the three reachable
+    /// `404`s distinct bodies, which is what lets `StaticFileServingTests` assert *which* layer answered
+    /// rather than only that something did.
+    ///
+    /// `@RawRoute` is required, not chosen: there is no matched template, so there is nothing to decode
+    /// against and nothing to encode a return value into — a non-raw `@NotFound` is diagnosed. `@Path` is
+    /// unavailable here for the same reason. The generated registration wraps the sender in a
+    /// `ResponseHeaderApplyingSender`, so the head written below still picks up every global
+    /// middleware's contributed field; a fallback is the one response nobody declares and therefore the
+    /// easiest place to lose them.
+    ///
+    /// Registered via `registerNotFound` *before* `finalize()`, so it is a real route inside the router —
+    /// which is precisely why the static middleware, sitting outside the router, gets to answer over it.
+    ///
+    /// **`consuming Sender`, not `consuming sending Sender`**, and that is forced rather than chosen. The
+    /// generated registration passes `ResponseHeaderApplyingSender(wrapping: responseSender, …)` — a
+    /// non-`Sendable` value constructed in the closure's own task-isolated region — so a `sending`
+    /// parameter is a region-isolation error at the call site the plugin emits, not here.
+    ///
+    /// The region is task-isolated for a reason that is neither wire-mvc's nor this app's: the wrapper
+    /// holds the `ResponseHeaderRegistry`, which travels inside the request context, and the proposal's
+    /// `HTTPServerRequestHandler.handle` declares `reader` and `responseSender` `consuming sending` but
+    /// `requestContext` plain `consuming`. A reader therefore takes `sending` here today and a wrapped
+    /// sender cannot. See the parity note for the measurements and the three ways out — the smallest is
+    /// one word upstream.
+    ///
+    /// Nothing is lost meanwhile: `sending` would only buy the ability to hand the sender to an
+    /// unstructured task, which a fallback has no reason to do.
+    @NotFound
+    @RawRoute
+    package func noRoute<Sender: HTTPResponseSender & ~Copyable>(
+        request: HTTPRequest,
+        responseSender: consuming Sender
+    ) async throws where Sender.Writer: ~Copyable {
+        try await WireMVCOutcome.json(
+            NoRoute(unmatched: request.path ?? "", method: request.method.rawValue),
+            status: .notFound
+        ).send(on: responseSender)
+    }
 }
 
 /// The server bind config the composition root injects. `package` so a test target re-composing the app can
