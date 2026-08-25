@@ -1,7 +1,7 @@
 import AsyncHTTPClient
 package import HTTPTypes
 package import Wire
-package import WireConfiguration
+import WireConfiguration
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials

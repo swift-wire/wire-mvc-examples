@@ -1,8 +1,8 @@
 import Foundation
-package import HTTPTypes
+import HTTPTypes
 import Testing
 import WireMVCTesting
-package import YAMLConfig
+import YAMLConfig
 
 /// Both ends of the extension point around one codec, and the first route in this repo whose **response**
 /// mode is declared outside WireMVC.

@@ -1,5 +1,5 @@
 public import AsyncStreaming
-public import BasicContainers
+import BasicContainers
 public import HTTPTypes
 public import WireMVC
 
@@ -191,7 +191,11 @@ where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields? {
                 }
                 return finalElement != nil
             }
-        } catch let error as EitherError<Reader.ReadFailure, any Error> {
+        } catch {
+            // `read` is the only throwing call in the `do` and declares
+            // `EitherError<Reader.ReadFailure, any Error>`, so that is what `error` is bound as — naming it
+            // in the pattern was a cast that could not fail.
+            //
             // Unwrapped so the binding's own errors stay mappable by `@ErrorResponse`.
             try error.unwrap()
         }

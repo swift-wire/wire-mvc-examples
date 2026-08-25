@@ -4,7 +4,7 @@ import HTTPTypes
 import Logging
 package import NIOHTTPServer
 package import Wire
-package import WireConfiguration
+import WireConfiguration
 package import WireMVC
 package import WireMVCMiddleware
 import WireMVCRouter
