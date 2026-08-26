@@ -324,6 +324,30 @@ struct TodoVerificationTests {
             )
             #expect(accepted.status == .ok)
             #expect(try decode(StreamedUploadReceipt.self, accepted).read == ["a.bin": 5])
+
+            // **Work that outlives the request** — and on this runtime, the only one that had to build a
+            // `ServiceGroup` to get it. `app.testing()` boots through Vapor's synchronous `boot()`, which
+            // is why `WireGraphServices` implements the sync `didBoot`: were it `didBootAsync`, the `202`
+            // below would still be written and nothing would ever run the job, which is exactly what this
+            // runtime did before the shared controllers grew a worker.
+            let enqueued = try await execute(.POST, "/jobs", json: true, body: #"{"text":"the cat sat on the mat"}"#)
+            #expect(enqueued.status == .accepted)
+            let queued = try decode(JobRecord.self, enqueued)
+            #expect(queued.state == .queued, "the 202 is written before the worker has been handed anything")
+
+            // The record is in MongoDB before the response was written — what `submit` awaits its write
+            // for. Silent about which state comes back: the worker may already have run it.
+            #expect(try await execute(.GET, "/jobs/\(queued.id)").status == .ok)
+
+            // Poll, because the answer is by construction not in the response above.
+            var finished = queued
+            for _ in 0..<5_000 {
+                finished = try decode(JobRecord.self, try await execute(.GET, "/jobs/\(queued.id)"))
+                if finished.state == .completed || finished.state == .failed { break }
+                try await Task.sleep(for: .milliseconds(1))
+            }
+            #expect(finished.state == .completed)
+            #expect(finished.summary == "the:2")
         }
     }
 }

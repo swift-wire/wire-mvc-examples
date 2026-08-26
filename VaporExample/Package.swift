@@ -63,8 +63,10 @@ let package = Package(
                 // Vapor binds no task-local logger (its request logger is a stored property on `Request`),
                 // so WireMVC mints the per-request one — the runtime-independent target.
                 .product(name: "WireMVCLogging", package: "wire-mvc"),
-                // This runtime binds no services, but the generated `_WireGraph: WireMVCComposable`
-                // conformance references `any Service`.
+                // The shared controllers' `JobWorker` is a `Service`, and this runtime is the one that
+                // has to run the collation itself — Vapor has no ServiceLifecycle integration, so
+                // `configure` builds the `ServiceGroup`. The generated `_WireGraph: WireMVCComposable`
+                // conformance references `any Service` besides.
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
             ],
             // The decomposed three-plugin form, not the bundled `WireMVCBuildPlugin`: that one runs

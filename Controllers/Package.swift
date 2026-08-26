@@ -41,6 +41,10 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-http-api-proposal.git", .upToNextMinor(from: "0.2.0")),
         .package(url: "https://github.com/apple/swift-http-types.git", from: "1.6.0"),
         .package(url: "https://github.com/apple/swift-collections.git", from: "1.6.0"),
+        // The job worker is a `ServiceLifecycle.Service`, collated into the graph's services by
+        // `@BackgroundService`. It arrives transitively through WireMVC, but `MemberImportVisibility`
+        // means a module that *names* `Service` must depend on it directly.
+        .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.11.0"),
     ],
     targets: [
         .target(
@@ -52,16 +56,27 @@ let package = Package(
                 .product(name: "HTTPAPIs", package: "swift-http-api-proposal"),
                 .product(name: "HTTPTypes", package: "swift-http-types"),
                 .product(name: "BasicContainers", package: "swift-collections"),
+                .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
             ],
             swiftSettings: proposalSettings
         ),
-        // Pure-logic unit tests. The only thing in this package that warrants them is the multipart parser:
-        // everything else here is a controller whose behaviour is a route, tested over the wire in each
-        // runtime's suite. A boundary parser is different — it is security-adjacent, its failure modes are
-        // silent (a two-byte corruption of every part), and it needs no server to exercise.
+        // Pure-logic unit tests, for the two things in this package that are not a route. Everything else
+        // here is a controller whose behaviour *is* a route, tested over the wire in each runtime's suite.
+        // The multipart parser is different — security-adjacent, with silent failure modes (a two-byte
+        // corruption of every part) and no server needed to exercise it. So is the job worker: its drain,
+        // its startup sweep and its claim ordering are properties of a `ServiceGroup` and a store, not of
+        // HTTP — observable only by running a group, and asserting the drain through a route suite would
+        // mean asserting on the suite's own teardown.
         .testTarget(
             name: "ControllersTests",
-            dependencies: ["Controllers"],
+            dependencies: [
+                "Controllers",
+                // `JobWorkerTests` runs the worker in a real `ServiceGroup` against an in-memory
+                // `JobStore` — the only way to arm the graceful-shutdown handler its drain depends on,
+                // and the only place the claim ordering and the startup sweep are observable.
+                .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
+                .product(name: "Logging", package: "swift-log"),
+            ],
             swiftSettings: proposalSettings
         ),
     ]

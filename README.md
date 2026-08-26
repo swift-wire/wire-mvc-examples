@@ -178,15 +178,54 @@ in the shared package would break the other two executables at startup.
   `@Singleton(as: TodoRepository.self)` backend. So each graph proves a library declares a need
   and the app satisfies it across a package boundary. (`Hummingbird` → a real Valkey key-value
   store, its client run as a graph-hosted service; other runtimes → other backends.)
-- **The persistence axis collapses to one binding.** The six `hummingbird-examples/todos-*`
-  differ mainly in their database (DynamoDB / Fluent / Postgres / …). Here that's a single
-  `@Singleton(as: TodoRepository.self)` swap, and each runtime demonstrates a *different* real
-  backend through that one binding — Valkey (Hummingbird), MongoDB (Vapor), CouchDB (proposal) —
-  without changing a line of the controller.
-- **The graph can host services.** A backend that owns a `ServiceLifecycle` run loop (a client's
-  connection pool) is contributed to WireMVC's `services` collation; `apply` returns the collated
-  `[any Service]`, and the app runs them in its `ServiceGroup` alongside the server. The Hummingbird
-  runtime's Valkey client is bound *and* run this way.
+- **The persistence axis collapses to one binding — three times over.** The six
+  `hummingbird-examples/todos-*` differ mainly in their database (DynamoDB / Fluent / Postgres / …). Here
+  that's a single `@Singleton(as: TodoRepository.self)` swap, and each runtime demonstrates a *different*
+  real backend through that one binding — Valkey (Hummingbird), MongoDB (Vapor), CouchDB (proposal) —
+  without changing a line of the controller. `SessionManager` and `JobStore` are the same shape against the
+  same three stores: three protocols declared in `Controllers` and satisfied by each app, so a runtime's
+  database is named once per protocol and nowhere else.
+
+  The three `JobStore`s are where the stores stop looking interchangeable, and the differences are
+  commented where they land. Valkey's ids come from `INCR`, so it is the only one where the store
+  genuinely issues them; CouchDB and MongoDB mint UUIDs, having no server-side sequence. A record update
+  is one round trip on Valkey and MongoDB and two on CouchDB, which rejects a `PUT` without the current
+  `_rev`. And recovering unfinished jobs is a server-side query on MongoDB, an index walk on Valkey, and a
+  client-side filter over `_all_docs` on CouchDB, where the real answer is a view.
+- **The graph can host services, and work can outlive the request.** A binding that owns a
+  `ServiceLifecycle` run loop is contributed to WireMVC's `services` collation; `apply` returns the
+  collated `[any Service]`, and the app runs them in its `ServiceGroup` alongside the server. Two kinds of
+  binding arrive by that one route: a *backend's* plumbing (the Hummingbird runtime's Valkey client, whose
+  connection pool is its run loop) and the application's *own work* — `Controllers`' `JobWorker`.
+
+  The worker is bound `@Singleton(as: JobProcessor.self) @BackgroundService`, so **the route talks to the
+  service**. `JobsController` injects `some JobProcessor` and cannot tell that the thing answering its
+  `submit` is also running in the app's group; the graph constructs one instance and hands it to both.
+  That is the claim: hosting work that outlives the request costs the *route* nothing.
+
+  `POST /jobs` answers `202` with a record that can only say `queued`, and `Location` names where the
+  answer will appear. It **awaits the store write before responding**, which is what makes the `202` a
+  promise rather than a hope — the record is already durable when the response is written, so the job
+  survives the process that accepted it.
+
+  What makes the worker a `Service` rather than a detached `Task` is shutdown, in both directions. `run()`
+  wraps its loop in `withGracefulShutdownHandler`, and the handler *finishes* the queue rather than
+  cancelling it: new submissions are refused with `503`, everything already accepted still runs, and the
+  group does not consider shutdown done until `run()` returns. Before the loop, it **sweeps** — anything a
+  previous process left `queued` or `running` is recovered, which makes the contract explicitly
+  at-least-once and is why `running` is a state rather than decoration. A detached task has none of this:
+  nothing tells it shutdown began, nothing waits for it, and nothing picks up what it dropped.
+
+  Two consequences the routes make visible. A job that **fails after acceptance** is a record, not a
+  status: the caller's `202` was written long before, so `@ErrorResponse` cannot reach the failure and
+  `GET /jobs/{id}` answers `200` carrying `failed`. And validation splits in two — `POST /jobs` refuses an
+  empty body at the boundary (`400`, no id issued), while text that contains no *words* is only discovered
+  by doing the work, which is the shape every queue's validation has.
+
+  The runtimes reach the group three different ways, and only one of them is free: the proposal runtime's
+  generated `@main` passes the services to `WireMVC.serve`, Hummingbird takes them into
+  `Application(services:)`, and **Vapor has no ServiceLifecycle integration at all**, so `configure` builds
+  the `ServiceGroup` itself in a `LifecycleHandler`.
 
 ## Running
 
@@ -201,8 +240,8 @@ cd HummingbirdExample && swift run HummingbirdExample
 ```
 
 Route verification lives in each package's test target, which drives the full CRUD lifecycle — both
-authoring styles, `/me`, `/export`, `/contact`, `/config`, `/upload`, `/upload/stream` and `/wiring` —
-against a throwaway backend container it provisions
+authoring styles, `/me`, `/export`, `/contact`, `/config`, `/upload`, `/upload/stream`, `/jobs` and
+`/wiring` — against a throwaway backend container it provisions
 via swift-local-containers. So `swift test` needs a container runtime (Docker); the suites skip
 themselves when none is available. Validated on macOS and Linux (see CI).
 
