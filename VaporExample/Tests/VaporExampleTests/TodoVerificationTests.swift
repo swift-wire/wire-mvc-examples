@@ -348,6 +348,36 @@ struct TodoVerificationTests {
             }
             #expect(finished.state == .completed)
             #expect(finished.summary == "the:2")
+
+            // **Attribute-based access control, and the one feature here that costs a runtime nothing.**
+            // Every other cross-runtime capability in this repository has a seam each app must satisfy —
+            // `TodoRepository`, `SessionManager`, `JobStore` — because each of them is a database. The
+            // policy set, the engine, the gate and the document store are all in `Controllers`, so
+            // `configure.swift` does not mention any of them and these four requests are the proof that
+            // the middleware fold and the request-scoped controller compose the same way through
+            // `WireMVCServerTransport` as they do on the native path.
+            //
+            // The two decision tiers stay distinguishable on this host: `ScreenAccess` writes its own
+            // response and carries an `AccessDenial` body naming the rule, while a handler refusal is
+            // `@ErrorResponse`'s bodiless status.
+            let unauthenticated = try await execute(.GET, "/documents/notes")
+            #expect(unauthenticated.status == .unauthorized, "no principal — the scope failed to build")
+
+            // Gate tier: a suspended account is refused from the request alone, before the scope exists.
+            let gated = try await execute(.GET, "/documents/notes", extraHeaders: ["x-user": "erin"])
+            #expect(gated.status == .forbidden)
+            #expect(try decode(AccessDenial.self, gated).policy == "SuspendedSubjectRule")
+
+            // Handler tier: `bob`'s clearance does not reach this document's classification, which is not
+            // knowable until it is loaded.
+            let refused = try await execute(.GET, "/documents/sequencing", extraHeaders: ["x-user": "bob"])
+            #expect(refused.status == .forbidden)
+            #expect(refused.body.readableBytes == 0, "bodiless — the handler refused, not the gate")
+
+            // Filter tier: the collection is the subset `bob` may read, not a refusal.
+            let visible = try await execute(.GET, "/documents", extraHeaders: ["x-user": "bob"])
+            #expect(visible.status == .ok)
+            #expect(try decode([Controllers.Document].self, visible).map(\.id) == ["notes"])
         }
     }
 }

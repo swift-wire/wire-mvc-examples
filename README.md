@@ -127,6 +127,28 @@ in the shared package would break the other two executables at startup.
   sentinel. A binding that fails to build maps exactly like a handler throw; gates are reserved for
   authorization. The token→session-id mapping lives in each runtime's own database behind a
   `SessionManager` binding, so the same token yields the same identity across requests.
+- **Authorization as a set of bindings, not as where you put the annotation.** `/documents` is governed by
+  attribute-based access control: seven rules, each an ordinary `@Singleton` contributed to one
+  `CollectedKey<any AccessPolicy>`, combined by a `PolicyEngine` that knows none of them individually
+  (deny-overrides, then permit-required). Adding a rule to the app is adding a `@Contributes` annotation —
+  there is no registry to edit and no route to change. A role is an *attribute* rather than a permission,
+  which is what makes the model ABAC rather than RBAC: `AdministratorGrant` permits every action, and an
+  administrator is still refused a document above her clearance, because a grant is not an override.
+
+  **The decision does not fit in one tier**, and that is structural. A route-scope middleware is handed the
+  request and the route it is folded onto, but not a request-scoped binding — a `@Factory` template
+  resolves its dependencies once into an app `@Singleton`, and the fold is entered before the scope is.
+  Above all it is not handed the **resource**, which has not been loaded, and no tier ordering fixes that.
+  So the same policy set is
+  consulted twice: `ScreenAccess`, one controller-scope gate, refuses what the request alone can refuse
+  (a suspended account, a mutation from the external network zone) before the store is touched; and each
+  handler authorises again with the document in hand. `GET /documents` does neither — it *filters*, on the
+  same decision function the item route uses, which is what stops a list from disagreeing with a read.
+
+  The gate answers with a body naming the rule and the handler's `@ErrorResponse` answers a bodiless `403`,
+  so the suites can tell which tier refused. Nothing under `/documents` is bound per runtime, which makes
+  it the one feature here that costs a runtime nothing to serve.
+
 - **Multipart, both directions, neither in the framework.** `GET /export` streams `multipart/mixed` **out**
   through a sender-transforming middleware (below); `POST /upload` reads `multipart/form-data` **in** through
   `@MultipartSummary`, a binding on WireMVC's `.readerBody` tier. The upload is parsed a chunk at a time,

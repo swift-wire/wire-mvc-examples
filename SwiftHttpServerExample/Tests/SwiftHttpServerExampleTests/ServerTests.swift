@@ -328,6 +328,21 @@ struct TodosRoutingTests {
             }
             #expect(finished.state == .completed)
             #expect(finished.summary == "the:2")
+
+            // `/documents` over a real socket. The mocked suite covers the policy tiers in detail against
+            // the in-process dispatch; what only this one adds is that the gate's response survives the
+            // transport — it is written from a middleware rather than from a route terminal, which is a
+            // different path through `WireMVCOutcome.send` and the one nothing else here drives live.
+            let user = ["x-user": "erin"]
+            let gated = try await client.get("/documents/notes", headers: user)
+            #expect(gated.status == 403)
+            #expect(try gated.json(AccessDenial.self).policy == "SuspendedSubjectRule")
+
+            // And the handler tier's refusal, which is bodiless — the two are told apart the same way here
+            // as everywhere else.
+            let refused = try await client.get("/documents/sequencing", headers: ["x-user": "bob"])
+            #expect(refused.status == 403)
+            #expect(refused.bodyText.isEmpty)
         }
     }
 }

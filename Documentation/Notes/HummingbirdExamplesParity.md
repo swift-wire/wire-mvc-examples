@@ -2,10 +2,10 @@
 
 > **Status:** planning note, revised 2026-08-26. Assessed against `hummingbird-examples` @ 2026-08-15
 > (28 examples). Records the gap list, the order of work, and the two framework limits that shape it.
-> **Parity track: three of five done** — the bridge's request-body streaming, file serving over the
-> fallback, and jobs. What remains is `auth-abac` and the `upload` half that belongs to the streaming
-> track. Each item's entry carries what its implementation settled, including where the item as written
-> turned out to be about something else.
+> **Parity track: four of five done** — the bridge's request-body streaming, file serving over the
+> fallback, jobs, and `auth-abac`. What remains is the `upload` half that belongs to the streaming track,
+> which leaves the parity track with nothing of its own outstanding. Each item's entry carries what its
+> implementation settled, including where the item as written turned out to be about something else.
 
 ## The two limits
 
@@ -48,6 +48,7 @@ Streaming request bodies were *not* part of that ceiling — see the first work 
 | response-body-processing | the `MultiPartSender<S>` sender-transforming middleware |
 | sessions (partly) | `@Scoped(seed: HTTPRequest.self)` `/me` + `SessionManager` |
 | jobs | `@BackgroundService` `JobWorker` + a per-runtime `JobStore` + `POST /jobs`, on all three runtimes |
+| auth-abac / auth-permissions | seven `AccessPolicy` bindings on one `CollectedKey` + a controller-scope gate + `/documents`, on all three runtimes |
 
 ## The order — parity track
 
@@ -256,8 +257,123 @@ Streaming request bodies were *not* part of that ceiling — see the first work 
    probe job to completion before triggering, which is proof the group reached `.running` and that the
    worker's loop is iterating.
 
-4. **auth-abac / auth-permissions.** Policy objects as bindings, composed by route-scope middleware.
-   The existing API-key gate is a toy next to this.
+4. ~~**auth-abac / auth-permissions**~~ — **done**, in the shared `Controllers` package like jobs, and with
+   **no per-runtime binding at all**: the policy set, the engine, the gate and the document store are all
+   portable, so this is the one feature here whose arrival on a runtime costs that runtime nothing. Seven
+   rules, each a `@Singleton` contributed to one `CollectedKey<any AccessPolicy>`, combined by a
+   `PolicyEngine` (deny-overrides, then permit-required) that names none of them; `/documents` is the
+   resource, with owner, department and classification as its attributes.
+
+   **The item said "composed by route-scope middleware", and that half is what the implementation
+   overturned.** Once policy is a set of bindings the annotation stops carrying policy: a route-scope
+   placement would say "this route is the one that needs screening", which is a second, hand-maintained
+   encoding of a decision the set already makes — and a wrong one the moment a rule changes. So there is
+   one *controller*-scope gate, the **action** attribute comes from the request method, and the policy
+   lives entirely in the set. The contrast with the API-key gate is not strictness, it is that the toy
+   encodes its rule in *where the annotation was put*, so the only way to read the app's policy is to grep
+   for annotations.
+
+   Per-route policy could not have been expressed by placement when this was written, which was the first
+   of three structural findings — all three about what a middleware is not told. **The first has since
+   been fixed, forced by this item**, and the other two stand:
+
+   - ~~**A middleware does not know which route it is on.**~~ **Fixed.**
+     `RequestResponseMiddlewareBox` now carries a `RouteContext` — the matched template and its path
+     parameters — alongside the request, so one gate folded once can read which route it is on. Before
+     that, a genuinely per-route rule needed a distinct `FactoryKey` and a distinct middleware type per
+     route. `ScreenAccess` still does not use it, and the reason is the one this section already gives:
+     the policy set decides which requests need screening, and keying on the route would be a second
+     encoding of that decision. What changed is that the choice is a choice.
+   - **A middleware cannot reach a request-scoped binding**, for two independent reasons, each established
+     by compiling the alternative rather than by reading the codegen. A `@Factory` template's `@Inject`
+     deps are resolved **once**, into the synthesised `_WireFactory_<key>`, which is an app `@Singleton` —
+     injecting `Caller` is `error: no binding produces 'Caller'`. And the ordering would defeat it even if
+     it resolved: in every generated register closure the fold is built and entered *before*
+     `_wireEnterScope` is called, since the scope entry happens inside the fold's terminal. So the gate
+     resolves the subject from the request itself, and the request-scoped `Caller` binding resolves it
+     again a moment later — two dictionary reads here, two round trips against a real identity provider.
+
+     **swift-wire's guided diagnostic for this offered a fix that did not exist** — reported from here,
+     and **since fixed**. The note read *"scope `_WireFactory_ControllerMiddleware_screenAccess` to
+     `@Scoped(seed: HTTPRequest.self)` too, or extract the scope-bound concern into a wrapper bound at the
+     wider scope"*. The first half could not be written: `@Scoped` and `@Factory` both synthesise an
+     `init`, so together they were an `invalid redeclaration`, and supplying the `init` by hand to get past
+     that, the plugin ignored the scope macro and still diagnosed the template as a singleton. It was the
+     generic scope-mismatch text meeting the one consumer kind "scope it too" is not a move for.
+     swift-wire now refuses a scope macro beside `@Factory` outright — two lifetime macros on one
+     declaration — and the note names the template and the moves that exist. The *restriction* is
+     unchanged and was never what wanted fixing: a template's deps resolve at the factory's scope, and
+     that is what `@Factory` being a lifetime of its own means.
+   - **And there is no channel from a middleware to the handler**, so the first resolution cannot be handed
+     forward even in principle: the generated terminal destructures the box and **discards the context**
+     — `withPendingContents { request, _, _, _, responseSender, drain in` — so even a context-transforming
+     middleware, which the box does support, reaches no handler.
+
+   **The double resolution is a smaller item than it first looked, and the obvious fix is the wrong one.**
+   Its *cost* is closable in the application by caching the directory lookup, which is what a deployment
+   with a real identity provider does anyway; the two resolutions cannot diverge here either, since both go
+   through `PrincipalDirectory.principal(presentedBy:)`. What a framework change would buy is only that the
+   tiers agree *by construction*. And "let middleware be scoped" would cost more than it buys: folding
+   inside the scope destroys the pre-authorisation property this gate exists for — a refusal currently
+   skips scope construction entirely, because `withPendingContents` is a no-op on a `responded` box — and
+   drops every contributed header field from the `401`, `Access-Control-Allow-Origin` included.
+
+   The likelier answer leaves the gate where it is and moves *authorisation* into the argument: a
+   `RequestBound` with graph access, whose seam already sits **after** scope entry in every generated
+   route, so it needs no reordering at all. That would also make an unauthorised route unwriteable rather
+   than merely discouraged — this controller currently restates a load-then-authorise ordering in four
+   handlers, and nothing stops a fifth from omitting it. Written up, with three candidate designs and a
+   sequence, in wire-mvc's
+   [`ScopeAwareMiddlewareAndBindings.md`](https://github.com/tachyonics/wire-mvc/blob/main/Documentation/Notes/ScopeAwareMiddlewareAndBindings.md).
+
+   **Three of that sequence's steps have since shipped**, and none of them changes this file's code: route
+   identity on the box (which is what struck the first finding above), `@Factory` named and diagnosed as a
+   lifetime (which is what struck the diagnostic bug), and a seeded scope able to yield more than its
+   subject. The last is the prerequisite for the argument seam, and is deliberately inert until something
+   consumes it. The load-then-authorise ordering is still restated in four handlers, and closing that is
+   the step this item is waiting on.
+
+   **So the decision splits in two, and the split is the item.** The resource is what "can S do A on R"
+   turns on, and it has not been loaded when a middleware runs — so the same set is consulted at two tiers
+   by two callers with different attributes in hand. The rules do not know which caller is asking: one that
+   needs the resource returns `.notApplicable` when there is none, and that single convention is what makes
+   one set serve both.
+
+   **The gate must therefore answer *deny or undecided*, never permit**, and that is the one thing here
+   that would be a security bug if it were relaxed rather than a missed optimisation. Every
+   resource-reading rule abstains at the gate, so a query without a resource is missing an unknown number
+   of the rules that would have denied it — and `ReadGrant`, which is resource-independent, permits every
+   read. A gate treating that permit as final would wave through exactly the requests `ClearanceRule`
+   exists to stop. `screen` returns `AccessDenial?` rather than a decision, so the mistake is unwriteable
+   rather than discouraged; `screeningIsUndecidedWhereTheFullDecisionIsARefusal` pins the case.
+
+   Three smaller things, none of them anticipated:
+
+   - **The two tiers are distinguishable from outside with no test-only instrumentation**, because they
+     answer differently by construction: the gate writes its own response and can carry an `AccessDenial`
+     body naming the rule, while a handler refusal goes through `@ErrorResponse(E.self, .status)`, which
+     produces a **bodiless** status. So a `403` with a body came from before the terminal and one without
+     came from inside it. That asymmetry started as a wart and is the observation channel every suite here
+     leans on — the same role `NoRoute` plays for the static-file seam.
+   - **Authentication stays out of the gate.** A request presenting no known principal is forwarded
+     untouched and the request-scoped `Caller` fails to construct, which `@ErrorResponse` maps to `401`.
+     The gate never distinguishes "no identity" from "identity refused", because it never sees the first
+     case — and a suspended principal, which *does* authenticate, is a `403` from the gate. Two answers,
+     two layers, no branch in either.
+   - **A `@Scoped` controller under a keyed test suite needs `withClient(supplying:)` even when it
+     substitutes nothing.** `DocumentsControllerDoubles` is an empty struct — nothing under `/documents` is
+     bound per runtime — but the generated scope entry still reads the request's correlation, and an
+     uncorrelated request gets the harness's explicit `500`. The failure is confusing because it is
+     *partial*: gate-refused requests never reach the terminal and pass, so only the routes that reach a
+     handler fail, which reads as "the policy tier is broken" rather than "the request was not
+     correlated". Sits beside the jobs item's `@BindType`-cannot-reach-a-background-service rule as the
+     second thing worth knowing about which substitution primitive reaches what.
+
+   The exhaustive caller × action × resource matrix is a table in `ControllersTests/PolicyEngineTests`
+   rather than a request each, for the reason that suite states: an authorisation bug does not throw, it
+   answers `200`, and it answers `200` only for the caller nobody drove a request as. The runtime suites
+   assert what only a driven route can — that the decision reaches the response, and that the two tiers are
+   two — on all three hosts.
 5. **upload.** An unbounded body streamed to disk — blocked until step 1 and now ordinary parity work.
    Small, and the one parity item that overlaps the streaming track: a large streamed upload answered with
    a streamed response is the echo's shape.
