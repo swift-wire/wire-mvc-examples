@@ -304,6 +304,30 @@ struct TodosRoutingTests {
             let loggedOut = try await client.post("/session/logout", json: Credentials(user: "alice"))
             #expect(loggedOut.status == 204)
             #expect(loggedOut.head?.headerFields[values: .setCookie].contains { $0.contains("Max-Age=0") } == true)
+
+            // **Work that outlives the request**, over a real socket and a real store. The mocked suite
+            // covers these routes in-process against an `@Replaces` in-memory `JobStore`; what this adds is
+            // the graph's collated services running under the `.swiftHttpServer` mode — that mode's
+            // `defaultServices` is `.run` — with the job records in the same CouchDB as the todos.
+            let enqueued = try await client.post("/jobs", json: JobSubmission(text: "the cat sat on the mat"))
+            #expect(enqueued.status == 202)
+            let queued = try enqueued.json(JobRecord.self)
+            #expect(queued.state == .queued)
+
+            // The record is in CouchDB before the response was written — the property `submit` awaits its
+            // write for, and the one that makes the `202` survive this process. Silent about which state
+            // comes back: the worker may already have run it, and asserting `queued` would be asserting a
+            // race.
+            #expect(try await client.get("/jobs/\(queued.id)").status == 200)
+
+            var finished = queued
+            for _ in 0..<5_000 {
+                finished = try await client.get("/jobs/\(queued.id)").json(JobRecord.self)
+                if finished.state == .completed || finished.state == .failed { break }
+                try await Task.sleep(for: .milliseconds(1))
+            }
+            #expect(finished.state == .completed)
+            #expect(finished.summary == "the:2")
         }
     }
 }

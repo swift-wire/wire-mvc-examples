@@ -383,6 +383,40 @@ struct TodoVerificationTests {
             )
             #expect(accepted.status == .ok)
             #expect(try decode(StreamedUploadReceipt.self, accepted).read == ["a.bin": 5])
+
+            // **Work that outlives the request**, on the same `ServiceGroup` that runs the Valkey client —
+            // and *through* it, since `ValkeyJobStore` writes the job records over that same client.
+            // `WireMVCServerTransport.apply` returns one collated `[any Service]` and `Application(services:)`
+            // takes it whole, so a service the *application* authors (`JobWorker`, in the shared controllers)
+            // and one a *backend* owns (the client's connection pool) arrive by the identical route. `.live`
+            // is what makes this reachable at all: `.router` would answer the `202` and run nothing.
+            let enqueued = try await client.execute(
+                uri: "/jobs",
+                method: .post,
+                headers: json,
+                body: ByteBuffer(string: #"{"text":"the cat sat on the mat"}"#)
+            )
+            #expect(enqueued.status == .accepted)
+            let queued = try decode(JobRecord.self, enqueued)
+            #expect(queued.state == .queued, "the 202 is written before the worker has been handed anything")
+
+            // The record is in Valkey before the response was written — what `submit` awaits its write
+            // for. Silent about which state comes back: the worker may already have run it.
+            let immediately = try await client.execute(uri: "/jobs/\(queued.id)", method: .get)
+            #expect(immediately.status == .ok)
+
+            // Poll, because the answer is by construction not in the response above.
+            var finished = queued
+            for _ in 0..<5_000 {
+                finished = try decode(
+                    JobRecord.self,
+                    try await client.execute(uri: "/jobs/\(queued.id)", method: .get)
+                )
+                if finished.state == .completed || finished.state == .failed { break }
+                try await Task.sleep(for: .milliseconds(1))
+            }
+            #expect(finished.state == .completed)
+            #expect(finished.summary == "the:2")
         }
     }
 }

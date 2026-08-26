@@ -1,7 +1,11 @@
 # hummingbird-examples parity — what's missing, and in what order
 
-> **Status:** planning note. Assessed against `hummingbird-examples` @ 2026-08-15 (28 examples).
-> Records the gap list, the order of work, and the two framework limits that shape it.
+> **Status:** planning note, revised 2026-08-26. Assessed against `hummingbird-examples` @ 2026-08-15
+> (28 examples). Records the gap list, the order of work, and the two framework limits that shape it.
+> **Parity track: three of five done** — the bridge's request-body streaming, file serving over the
+> fallback, and jobs. What remains is `auth-abac` and the `upload` half that belongs to the streaming
+> track. Each item's entry carries what its implementation settled, including where the item as written
+> turned out to be about something else.
 
 ## The two limits
 
@@ -43,6 +47,7 @@ Streaming request bodies were *not* part of that ceiling — see the first work 
 | multipart-form | `@MultipartBody` + `@MultipartStream` + `/export` |
 | response-body-processing | the `MultiPartSender<S>` sender-transforming middleware |
 | sessions (partly) | `@Scoped(seed: HTTPRequest.self)` `/me` + `SessionManager` |
+| jobs | `@BackgroundService` `JobWorker` + a per-runtime `JobStore` + `POST /jobs`, on all three runtimes |
 
 ## The order — parity track
 
@@ -137,8 +142,120 @@ Streaming request bodies were *not* part of that ceiling — see the first work 
    both box destructures in fact declare `consuming sending`. The rule was right; the reason given for it
    was not, and both now say why plain `consuming` is simply the permissive spelling.
 
-3. **jobs.** A job queue as a graph-hosted `ServiceLifecycle` service plus a route that enqueues.
-   Nothing currently shows work outliving the request.
+3. ~~**jobs**~~ — **done**, in the shared `Controllers` package so all three runtimes serve it, and split
+   across two bindings rather than one: a per-runtime `JobStore` holding the records, and a `JobWorker`
+   that owns the in-process handoff, drains it, and *is* what the route talks to. `POST /jobs` /
+   `GET /jobs/{id}` in `JobsController`.
+
+   **Durability is not the one-line swap it looks like**, and that is the main thing this item settled. The
+   obvious first cut keeps the records in the same in-memory type as the handoff, on the reasoning that
+   making them durable changes only where `submit` writes. It does not. A real store added a startup sweep,
+   a double-delivery bug and the conditional claim that fixes it, an explicit at-least-once contract, and a
+   rule about which test substitution primitive can reach a background service at all. All of that hides
+   behind an in-memory version, which is why this item earns its keep against three real backends rather
+   than against a dictionary.
+
+   **The shape.** `JobWorker` is bound `@Singleton(as: JobProcessor.self) @BackgroundService` and is
+   generic over the opaque store — three things nothing had combined before (`@Singleton(as:)` with
+   `@Contributes` is absent from every harness in swift-wire, where every contributor is a plain
+   `@Singleton`). It composes exactly as wanted:
+
+   ```swift
+   let someJobProcessor = JobWorker(store: someJobStore)
+   let jobsControllerOfSomeJobProcessor = JobsController(jobs: someJobProcessor)
+   let anyServiceKeyedWireMVCKeysServices = [someJobProcessor] as [any Service]
+   ```
+
+   One construction, two consumers: the route talks to it and the `ServiceGroup` runs it. That is what
+   makes the handoff private — there is only one object, so nothing has to be told where to find the
+   stream. `JobsController` injects `some JobProcessor` and cannot tell that the thing answering its
+   `submit` is also a running service, which is the claim worth making: **hosting work that outlives the
+   request costs the route nothing.**
+
+   What the implementation settled, in rough order of how much it changed:
+
+   - **The sweep, and the bug it introduced.** With a durable store, `run()` can recover what a previous
+     process left `queued` (accepted, never handed over) or `running` (started, then lost) before entering
+     its loop. That immediately broke: a job submitted in the window *before* `run()` sweeps is written
+     `queued`, handed to the loop by `submit`, **and** found by the sweep a moment later — and it ran
+     twice. The window is not contrived: nothing on any of the three runtimes orders serving after the
+     `ServiceGroup` starts, so a route is reachable before its own service has begun. The unit suite caught
+     it on the first run, from the store's write log; from outside, a job run twice is indistinguishable
+     from one run once — same terminal state, same summary.
+
+     Fixed where a real queue fixes it, at the claim: `process` re-reads the record and skips it if it has
+     already reached a terminal state. That works because the loop is serial — the second delivery cannot
+     be claimed until the first has written its outcome. A record left `running` is deliberately *not*
+     skipped, since that is the sweep's other case and re-running it is the contract working rather than
+     the duplicate. `aJobSubmittedBeforeTheSweepIsNotRunTwice` pins it and fails without the fix.
+   - **So the contract is at-least-once, and says so.** A job whose process died after the work but before
+     the write is run again. That is the right default — the alternative is at-most-once, which drops work
+     — and it is why `running` is a state rather than decoration: it is what a later sweep reads to tell
+     "never started" from "started and lost". Distinguishing a *duplicate* from a *retry* without that
+     would need a lease or an owner token, which is a real job queue's answer and more than this example
+     should grow.
+   - **`@BindType` cannot reach a background service, and `@Replaces` can.** `@BindType` sources its
+     instance from a `doubles` value threaded into a scope at entry, so it reaches a binding built (or
+     rebuilt, via `@TestScopable`) per request. `JobWorker` is app-scoped by necessity — the group runs one
+     instance for the process's lifetime — and reads its store outside any request, since the sweep happens
+     before a request has ever arrived. There is no request to hang a double off. So the mocked suite
+     supersedes the CouchDB store with an `@Replaces` in-memory one, which is the first `@Replaces` in this
+     repository, and the suite stays Docker-free. The general rule: **a background service's collaborators
+     are `@Replaces` territory, not `@BindType` territory** — and the practical cost is that such a suite
+     asserts on behaviour through the routes rather than on interactions through `verify`, which is the
+     right level for a worker anyway.
+   - **`submit` awaits its write, and that is the whole meaning of the `202`.** An enqueue that only put
+     the job on the handoff would answer faster and promise less: the id would have to be minted in the
+     process, `GET /jobs/{id}` could `404` for a job just accepted, and a crash between the yield and the
+     worker's write would lose a job the caller was told was accepted — leaving the store a log of what the
+     worker did rather than a record of what was accepted, with nothing for the sweep to find. All three
+     runtime suites assert the durable version from outside, by re-reading the record immediately after the
+     `202` and requiring `200`. They deliberately say nothing about *which* state comes back: asserting
+     `queued` would be asserting that the worker had not got to it yet, which is a race.
+   - **Vapor was discarding the collated services**, and had been since the collation existed. `configure`
+     called `apply` for its side effect and dropped the return value, which cost nothing while that runtime
+     bound no service — the manifest comment even said so. Vapor 4 has no ServiceLifecycle integration at
+     all; nothing in it names `Service`, unlike Hummingbird's `Application(services:)` and unlike the
+     generated `@main`. The app now supplies the group itself in a `WireGraphServices: LifecycleHandler`,
+     registered **after** `WireGraphTeardown` (Vapor runs shutdown handlers in reverse, and the other order
+     disconnects MongoDB out from under a service still draining) and implementing the **synchronous**
+     `didBoot`, because `app.testing()` boots through the non-async `boot()` which calls only the sync
+     variants. Measured, not reasoned: substituting `didBootAsync` leaves the `202` intact and the job
+     never runs.
+   - **Draining is why the worker is a `Service` rather than a `Task`.** `run()` wraps its loop in
+     `withGracefulShutdownHandler` and the handler *finishes* the handoff instead of cancelling: new
+     submissions are refused with `503`, everything already accepted still runs, and the group waits for
+     `run()` to return. The one-line alternative, `cancelOnGracefulShutdown()`, means the opposite — it
+     abandons the job in hand and the whole backlog behind it. Also measured: substituting it fails
+     `gracefulShutdownDrainsWhatWasAlreadyAccepted` on 37–41 of the fifty accepted jobs across three runs,
+     a range rather than a number because it is a race.
+   - **A failure after acceptance is a record, not a status.** By the time the work throws, the caller's
+     `202` has been written and the connection is gone, so `@ErrorResponse` cannot reach it however it is
+     declared; `GET /jobs/{id}` answers `200` carrying `failed`. That asymmetry is why the two validation
+     checks are deliberately split: `submit` refuses empty text at the boundary in constant time and before
+     an id exists, while text that contains no *words* is only discovered by tokenising, which is the job.
+     Every queue's boundary validation is the shallow half by construction.
+
+   **The three stores are not interchangeable, and the differences are the interesting part of doing it
+   three times.** Ids: Valkey's come from `INCR`, which is atomic across clients and is therefore the only
+   one of the three where the *store* genuinely issues them; CouchDB and MongoDB use UUIDs, because neither
+   has a server-side sequence and a counter held in a process is the assumption a durable store exists to
+   remove. Updates: Mongo and Valkey write a whole record in one round trip, CouchDB needs two, since it
+   rejects a `PUT` without the document's current `_rev` — document-level MVCC, paid for per write. And the
+   sweep: Mongo *queries* for the unfinished states server-side, Valkey walks its index, and CouchDB scans
+   `_all_docs` and filters client-side, where the real answer is a view emitting on `state`. Each is called
+   out where it lands, so the example does not read as though one shape fits all three.
+
+   Two smaller things, neither specific to the store. `services: .run` is not a `.wiremvc(…)` suite's
+   default and should not be — starting a graph's services to test a `@Get` would start a database client —
+   and the failure mode is worth knowing: with services skipped the `202` still comes back and the job
+   stays `queued` forever, which is precisely what a deployment that never handed `apply`'s services to a
+   group looks like, so a test asserting only on the `202` asserts nothing. And
+   `ServiceGroup.triggerGracefulShutdown()` on a group still in `.initial` transitions it straight to
+   `.finished`, after which the pending `run()` throws `alreadyFinished`; the unit tests therefore run a
+   probe job to completion before triggering, which is proof the group reached `.running` and that the
+   worker's loop is iterating.
+
 4. **auth-abac / auth-permissions.** Policy objects as bindings, composed by route-scope middleware.
    The existing API-key gate is a toy next to this.
 5. **upload.** An unbounded body streamed to disk — blocked until step 1 and now ordinary parity work.
