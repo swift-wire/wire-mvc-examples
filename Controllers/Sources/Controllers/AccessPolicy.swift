@@ -9,34 +9,34 @@ public import Wire
 // What that buys over the API-key gate in `TodosMiddleware.swift` is not strictness, it is *where the
 // policy lives*. The gate encodes its rule in the annotation's placement: `@Middleware(requireAPIKey)` on
 // `delete` and nowhere else means "deleting needs a key", and the only way to read the app's policy is to
-// grep for the annotation. Here the placement says nothing — one gate sits on the whole controller — and
-// the policy is the *set*, which can be listed, ordered, tested one rule at a time, and extended by adding
-// a binding rather than by editing a route.
+// grep for the annotation. Here no annotation carries policy at all — the policy is the *set*, which can
+// be listed, ordered, tested one rule at a time, and extended by adding a binding rather than by editing
+// a route.
 //
-// **The decision does not fit in one tier, and that is structural rather than a choice made here.** A
-// route-scope middleware is handed the request and nothing else: `RequestResponseMiddlewareBox` carries
-// the request, the context, the reader and the sender, and the generated terminal discards the context
-// before calling the handler. So a middleware cannot be told which route it is on and cannot see the
-// matched path parameters; it cannot inject a request-scoped binding either, because a `@Factory`
-// template resolves its deps once into an app `@Singleton` and the fold runs before the scope is entered
-// (see ``Caller``, which records what the compiler says about each half). Above all it cannot see the
-// **resource**, which has not been loaded yet.
+// **The decision splits by attributes, not by layers**, and the split is what makes one set serve
+// everything. Some rules need only the request — a suspended account, a mutation from the external zone.
+// The rest need the **resource**, which means loading it. So the set is consulted twice, by two callers
+// with different attributes in hand:
 //
-// So the same policy set is consulted twice, by two callers with different attributes in hand:
+// 1. ``PolicyEngine/screen(subject:action:environment:)`` with no resource. It answers **deny or
+//    undecided, never permit** — see that method for why treating a permit as final there would be a
+//    security bug rather than an optimisation.
+// 2. ``PolicyEngine/authorize(_:)`` once the document is in hand, with every attribute. Plus
+//    ``PolicyEngine/permits(_:)`` for the collection, which filters rather than refuses.
 //
-// 1. ``PolicyEngine/screen(subject:action:environment:)`` from ``ScreenAccess``, the gate, with no
-//    resource. It answers **deny or undecided, never permit** — see that method for why treating a permit
-//    as final there would be a security bug rather than an optimisation.
-// 2. ``PolicyEngine/authorize(_:)`` from the handler, once the document is in hand, with every attribute.
-//    Plus ``PolicyEngine/permits(_:)`` for the collection route, which filters rather than refuses.
+// Both calls happen in the same place — see ``DocumentAuthorizer`` and ``DocumentLister`` — which is the
+// point: two questions, one seam, no ordering for a route to get wrong. They *could* be split across
+// layers, with the first in a middleware that refuses before the request scope exists; ``DocumentsController``
+// weighs what that buys. Nothing in this file changes either way, which is the argument for the set being
+// the policy rather than the placement being it.
 //
 // The rules themselves are written once and do not know which caller is asking: a rule that needs the
 // resource returns ``PolicyDecision/notApplicable`` when there isn't one, and that single convention is
-// what makes one set serve both tiers.
+// what makes one set answer both questions.
 //
 // This file is the part an application edits — the attributes and the rules. The machinery they are
 // edited against (the combining algorithm, the refusal it produces, and where subject attributes come
-// from) is in `PolicyEngine.swift`; the gate itself is in `AccessGate.swift`.
+// from) is in `PolicyEngine.swift`; the bindings that consult it are in `AuthorizedDocument.swift`.
 
 // MARK: - The attributes
 
@@ -61,7 +61,8 @@ public enum Role: String, Sendable, Hashable {
 /// `suspended` is deliberately an attribute of the principal rather than an absence from the directory. A
 /// suspended account still authenticates; what changes is that every policy decision goes against it. Told
 /// apart from an unknown user, this is the difference between `403` and `401`, and the two answers are
-/// produced by different layers here — the gate and the scope — which is what makes them testable apart.
+/// produced by different mechanisms here — a policy decision and a binding that fails to build — which is
+/// what makes them testable apart.
 public struct Principal: Sendable, Equatable {
     public let user: String
     public let roles: Set<Role>
@@ -78,12 +79,15 @@ public struct Principal: Sendable, Equatable {
     }
 }
 
-/// The **action** attribute. One value per thing that can be attempted, mapped from the request method by
-/// ``ScreenAccess`` and named directly by each handler.
+/// The **action** attribute. One value per thing that can be attempted, named by the route's binding —
+/// `@AuthorizedDocument("update")` — and `String`-backed so the annotation's argument reaches it.
 ///
-/// There is no `list`. A collection route asks the same `read` question once per document and keeps the
-/// ones that pass (``DocumentsController/list()``), so "may I see this" has exactly one spelling and the
-/// list route cannot drift away from the item route's answer.
+/// A screening layer in front of the request scope would derive it from the request *method* instead,
+/// which is the other place an action attribute honestly comes from; both spell the same values.
+///
+/// There is no `list`. A collection asks the same `read` question once per document and keeps the ones
+/// that pass (``DocumentLister``), so "may I see this" has exactly one spelling and the collection cannot
+/// drift away from the item route's answer.
 public enum AccessAction: String, Sendable, Equatable {
     case read
     case create
@@ -95,8 +99,8 @@ public enum AccessAction: String, Sendable, Equatable {
     public var isMutating: Bool { self != .read }
 }
 
-/// The **resource** attributes — the half a gate cannot have, because reading them means loading the
-/// thing, which is the handler's job.
+/// The **resource** attributes — the half no layer in front of the store can have, because reading them
+/// means loading the thing.
 ///
 /// A struct separate from ``Document`` so a *proposed* resource can be described before one exists:
 /// `POST /documents` authorises against the attributes the new document would have, which is the only way
@@ -134,8 +138,8 @@ public struct RequestEnvironment: Sendable, Equatable {
         self.zone = zone
     }
 
-    /// The header the zone is read from, named once so the gate and the request-scoped ``Caller`` cannot
-    /// disagree about it.
+    /// The header the zone is read from, named once so nothing that reads it can disagree about it — the
+    /// request-scoped ``Caller``, and any screening layer an application puts in front of the scope.
     public static let zoneHeader = "x-network"
 
     /// Resolve the zone from a request. Anything that is not the literal `internal` — including an absent
@@ -149,9 +153,10 @@ public struct RequestEnvironment: Sendable, Equatable {
 
 /// One question put to the policy set.
 ///
-/// `resource` is optional, and that optionality is the tier boundary made into a type: the gate builds a
-/// query without one and the handler builds a query with one, and a rule decides which of the two it can
-/// answer by pattern-matching on it.
+/// `resource` is optional, and that optionality is the attribute boundary made into a type: a query built
+/// before the store is read has none and one built after has one, and a rule decides which of the two it
+/// can answer by pattern-matching on it. Which *layer* builds each is an application's choice; the type is
+/// the same either way.
 public struct AccessQuery: Sendable {
     public let subject: Principal
     public let action: AccessAction
@@ -178,8 +183,8 @@ public struct AccessQuery: Sendable {
 /// Three cases, not two. ``notApplicable`` is what makes a policy *set* composable: a rule that has
 /// nothing to say about this query says so, rather than having to invent a permit (which would make it an
 /// authority over questions it does not understand) or a deny (which would make every rule a veto over
-/// every route). It is also the single mechanism by which one set serves both tiers — a resource-reading
-/// rule is `notApplicable` at the gate by construction.
+/// every route). It is also the single mechanism by which one set answers both questions — a
+/// resource-reading rule is `notApplicable` without a resource by construction.
 public enum PolicyDecision: Sendable, Equatable {
     case permit
     case deny(String)
@@ -211,8 +216,9 @@ public enum AccessPolicies {
     public static let all = CollectedKey<any AccessPolicy>()
 }
 
-/// Denies everything for a suspended principal. **Resource-independent**, so the gate refuses the request
-/// before the handler runs and before the store is touched — one of exactly two rules that can.
+/// Denies everything for a suspended principal. **Resource-independent**, so it refuses the request before
+/// the store is touched — one of exactly two rules that can, and therefore one of exactly two that a
+/// screening layer in front of the request scope could act on.
 ///
 /// First by `withOrder:` for reporting rather than for correctness: the combining algorithm is
 /// deny-overrides, so order cannot change the outcome, but it does decide which denial is *named* when
@@ -226,8 +232,8 @@ public struct SuspendedSubjectRule: AccessPolicy {
 }
 
 /// Denies mutating actions from outside the internal network. The second **resource-independent** rule,
-/// and the reason the gate tier is worth having at all: a `DELETE` arriving from the public internet is
-/// refused without a lookup, which is what a pre-authorisation filter is for.
+/// and the one that makes a pre-authorisation filter tempting: a `DELETE` arriving from the public
+/// internet is refused without a lookup, and could be refused before the request scope exists at all.
 ///
 /// Reads two attribute sets and neither is the subject's — the case that is awkward to express in a model
 /// where authorisation hangs off an identity, and ordinary here.
@@ -241,7 +247,7 @@ public struct NetworkZoneRule: AccessPolicy {
 }
 
 /// Denies a subject whose clearance does not reach the resource's classification. **Resource-reading**, so
-/// it abstains at the gate and decides in the handler.
+/// it abstains until the document is loaded and decides after.
 ///
 /// This is the rule that proves a grant is not an override: `AdministratorGrant` permits, this denies, and
 /// deny-overrides means the administrator is refused. Pinned by

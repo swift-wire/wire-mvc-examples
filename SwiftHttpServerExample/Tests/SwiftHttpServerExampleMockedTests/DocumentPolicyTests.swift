@@ -7,20 +7,24 @@ import WireMVCTesting
 
 @testable import SwiftHttpServerExample
 
-/// `/documents` over the wire — and specifically **which tier answered**.
+/// `/documents` over the wire — and specifically **which rule answered**.
 ///
 /// The policy set itself is exhaustively covered by `PolicyEngineTests` in the `Controllers` package,
 /// where the whole matrix is a table and a denial can be read back by name. What only a driven route can
-/// show is that the decision reaches the response, and that the two tiers are actually two: a request the
-/// gate refuses never enters the request scope, and a request the handler refuses already has the document
-/// in hand.
+/// show is that the decision reaches the response — and, because every refusal here names the rule that
+/// produced it, that the *intended* rule refused rather than that something did.
 ///
-/// The suites can tell them apart without any test-only instrumentation, because the tiers answer
-/// differently by construction. ``ScreenAccess`` writes its own response and can therefore carry an
-/// ``AccessDenial`` body naming the rule; the handler throws, and `@ErrorResponse(E.self, .status)`
-/// produces a **bodiless** status. So a `403` with a body came from before the router's terminal, and a
-/// `403` without one came from inside it. That asymmetry is the observation channel here, the way
-/// `NoRoute` is in `StaticFileServingTests`.
+/// **That is the observation channel, and it is the one worth having.** An earlier shape of this file
+/// used a coarser one: a screening middleware answered with a body while a handler's `@ErrorResponse`
+/// answered a bodiless status, so a test could tell which *layer* refused by whether bytes came back.
+/// That told you nothing about which rule, and it stopped meaning anything the moment both halves of the
+/// decision moved into one binding. Reading `policy` is strictly better: `SuspendedSubjectRule` cannot be
+/// confused with `ClearanceRule` however the app is layered, and the assertions below survive a reader
+/// deciding to put a gate back — see ``DocumentsController``.
+///
+/// A `/api/documents/{id}` served from the OpenAPI document goes through the *same* bindings, and is
+/// asserted in the runtime suites rather than here: the mocked variant mounts the annotation-driven
+/// routes only.
 ///
 /// `.inProcess`, so the front layer, the real `FrozenTrieRouter` and the real middleware fold are the
 /// production ones — and Docker-free, because nothing under `/documents` is bound per runtime.
@@ -45,10 +49,9 @@ struct DocumentPolicyTests {
     /// `DocumentsControllerDoubles` is an empty struct, because nothing under `/documents` is bound per
     /// runtime. So the plain `withClient` is not the right client here; supplying nothing, explicitly, is.
     ///
-    /// The failure is confusing on first contact because it is *partial*: a request the gate refuses never
-    /// reaches the terminal, so the doubles are never looked up and those tests pass. Only the routes that
-    /// reach a handler fail — which reads as "the policy tier is broken" rather than "the request was not
-    /// correlated".
+    /// The failure is confusing on first contact because it is *partial*: a request refused before the
+    /// terminal never looks the doubles up, so those tests pass. Only the routes that reach a handler
+    /// fail — which reads as "the policy tier is broken" rather than "the request was not correlated".
     ///
     /// The generated typed client is handed back; these tests want statuses and bodies rather than decoded
     /// values, so they reach the `TestClient` underneath it.
@@ -58,15 +61,14 @@ struct DocumentPolicyTests {
         }
     }
 
-    // MARK: - Authentication is not the gate's question
+    // MARK: - Authentication is not a policy question
 
     /// No `x-user`: the request-scoped ``Caller`` fails to construct, and
     /// `@ErrorResponse(Unauthenticated.self, .unauthorized)` maps that to `401`.
     ///
-    /// The gate saw this request and forwarded it — it has no principal to screen and does not invent one,
-    /// so `401` is produced by the scope rather than by a middleware branch. A gate that answered here
-    /// would have to distinguish "no identity" from "identity refused", and would then own an
-    /// authentication decision it has no business making.
+    /// No rule is consulted at all: the scope fails to build, so nothing that decides about policy ever
+    /// runs. Keeping the two in different mechanisms is what stops any policy layer from having to
+    /// distinguish "no identity" from "identity refused" — it never sees the first case.
     @Test func aRequestWithNoPrincipalIsUnauthenticatedRatherThanForbidden() async throws {
         try await withDocuments { client in
             let response = try await client.get("/documents/notes")
@@ -84,11 +86,13 @@ struct DocumentPolicyTests {
         }
     }
 
-    // MARK: - The gate tier
+    // MARK: - The resource-independent rules
 
-    /// **Refused before the scope is entered, with a body naming the rule.** A suspended account is a
-    /// resource-independent denial, so ``ScreenAccess`` answers it from the request alone.
-    @Test func aSuspendedAccountIsRefusedByTheGate() async throws {
+    /// **Refused before the store is read, with a body naming the rule.** A suspended account is a
+    /// resource-independent denial, so the binding answers it from the request alone — the `guard` that
+    /// screens sits ahead of the `find`, which is what makes "before the store is read" structural rather
+    /// than incidental.
+    @Test func aSuspendedAccountIsRefusedWithoutReadingTheStore() async throws {
         try await withDocuments { client in
             let response = try await client.get("/documents/notes", headers: headers("erin"))
             #expect(response.status == 403)
@@ -97,13 +101,14 @@ struct DocumentPolicyTests {
         }
     }
 
-    /// The second gate-decidable rule, and the one that shows the tier earning its place: an external
-    /// `DELETE` is refused without the store being read and without the request scope existing.
+    /// The second resource-independent rule: an external `DELETE` is refused without the store being
+    /// read. It is also the rule that most tempts an application into a screening middleware, which would
+    /// refuse it without the request scope existing either — see ``DocumentsController``.
     ///
     /// The same caller deleting the same document from inside succeeds — see
     /// ``anOwnerDeletesTheirOwnDocumentFromTheInternalNetwork()`` — so this is the zone attribute and not
     /// something about `alice` or about `DELETE`.
-    @Test func anExternalMutationIsRefusedByTheGate() async throws {
+    @Test func anExternalMutationIsRefusedWithoutReadingTheStore() async throws {
         try await withDocuments { client in
             let response = try await client.delete(
                 "/documents/notes",
@@ -126,14 +131,20 @@ struct DocumentPolicyTests {
         }
     }
 
-    /// A refusal is still a response a browser fetched. ``ScreenAccess`` answers with `respondingWith`
-    /// rather than raw `responding`, so the response-header registry is drained onto it and the global
-    /// CORS middleware's `Access-Control-Allow-Origin` survives — without which a cross-origin caller
-    /// could not read the `403` it was given.
+    /// A refusal is still a response a browser fetched, so the global CORS middleware's
+    /// `Access-Control-Allow-Origin` has to survive it — without which a cross-origin caller could not
+    /// read the `403` it was given.
     ///
-    /// The same claim `corsFieldsSurviveAFileAnsweredHere` makes for the global tier, at the controller
-    /// tier and on the error path, which is where it is easiest to lose.
-    @Test func corsFieldsSurviveAGateRefusal() async throws {
+    /// This failed for a while and nothing caught it. The terminal resolved `headerFields` against the
+    /// response-header drain on the success path and built a bare status in its `catch`, so every
+    /// contributed field vanished from every `@ErrorResponse` refusal. It was invisible here because the
+    /// screening middleware this suite used to exercise answered with `respondingWith`, which drains — so
+    /// the one refusal the test drove was the one that worked. Fixed upstream in wire-mvc; the assertion
+    /// now means what it always claimed to.
+    ///
+    /// The same claim `corsFieldsSurviveAFileAnsweredHere` makes for the global tier, on the error path,
+    /// which is where it is easiest to lose.
+    @Test func corsFieldsSurviveARefusal() async throws {
         try await withDocuments { client in
             let response = try await client.get(
                 "/documents/notes",
@@ -146,18 +157,19 @@ struct DocumentPolicyTests {
         }
     }
 
-    // MARK: - The handler tier
+    // MARK: - The resource-reading rules
 
-    /// **The case the gate could not decide.** `bob`'s clearance does not reach `sequencing`'s
-    /// classification, and nothing about that is visible until the document is loaded — screened from the
-    /// request alone this is the same request as the one below it, which succeeds.
+    /// **The case no layer in front of the store could decide.** `bob`'s clearance does not reach
+    /// `sequencing`'s classification, and nothing about that is visible until the document is loaded —
+    /// from the request alone this is the same request as the one below it, which succeeds.
     ///
-    /// Bodiless, which is how this test knows the gate did not answer it.
-    @Test func aClearanceRefusalComesFromTheHandlerAndNotTheGate() async throws {
+    /// Named, which is how this test knows *which* rule refused: `ClearanceRule` is resource-reading, so
+    /// a refusal naming it could not have been decided before the document was loaded.
+    @Test func aClearanceRefusalNeedsTheDocumentLoaded() async throws {
         try await withDocuments { client in
             let refused = try await client.get("/documents/sequencing", headers: headers("bob"))
             #expect(refused.status == 403)
-            #expect(refused.bodyText.isEmpty, "a body would mean the gate answered")
+            #expect(try refused.json(AccessDenial.self).policy == "ClearanceRule")
 
             // Same caller, same method, same zone — only the resource differs.
             let permitted = try await client.get("/documents/notes", headers: headers("bob"))
@@ -171,7 +183,7 @@ struct DocumentPolicyTests {
         try await withDocuments { client in
             let response = try await client.get("/documents/sequencing", headers: headers("carol"))
             #expect(response.status == 403)
-            #expect(response.bodyText.isEmpty)
+            #expect(try response.json(AccessDenial.self).policy == "ClearanceRule", "not the grant's absence")
         }
     }
 
@@ -186,7 +198,8 @@ struct DocumentPolicyTests {
             )
             #expect(response.status == 403)
             // And the document is unchanged — the refusal happened before the store was written, which a
-            // status alone does not establish.
+            // status alone does not establish. Now structurally so rather than by handler discipline: the
+            // binding refuses while producing the argument, so `documents.update` is never reached.
             let reread = try await client.get("/documents/notes", headers: headers("bob"))
             #expect(try reread.json(Document.self).text == "who is doing what")
         }
@@ -235,10 +248,11 @@ struct DocumentPolicyTests {
     /// A caller who may read nothing gets an empty list and a `200`, not a `403`: asking for a collection
     /// is not an attempt at anything that can be refused.
     ///
-    /// Except that `erin` is suspended, so the gate refuses her before the filter ever runs — which is the
-    /// interaction worth pinning. The two tiers answer the same route differently depending on which rule
-    /// applies, and the gate wins because it is first.
-    @Test func aSuspendedCallersCollectionIsRefusedByTheGateRatherThanEmptied() async throws {
+    /// Except that `erin` is suspended, and a resource-independent rule refuses the *request* rather than
+    /// filtering it — which is the interaction worth pinning, and the reason ``DocumentLister`` screens
+    /// before it filters. A version that only filtered would answer `200 []` and quietly call "you may see
+    /// nothing" the same thing as "you are refused".
+    @Test func aSuspendedCallersCollectionIsRefusedRatherThanEmptied() async throws {
         try await withDocuments { client in
             let response = try await client.get("/documents", headers: headers("erin"))
             #expect(response.status == 403)
@@ -251,8 +265,8 @@ struct DocumentPolicyTests {
     /// A create is authorised against the attributes the document *would* have. `bob` may not create a
     /// document classified above his own clearance, because he could not then read it.
     ///
-    /// This is the case a gate could not reach even in principle: the resource attributes come from the
-    /// request body, which the middleware tier does not decode.
+    /// This is the case no screening layer could reach even in principle: the resource attributes come
+    /// from the request body, which nothing in front of the route decodes.
     @Test func aCreateIsAuthorisedAgainstTheAttributesItWouldHave() async throws {
         try await withDocuments { client in
             let refused = try await client.post(
@@ -261,7 +275,9 @@ struct DocumentPolicyTests {
                 headers: headers("bob")
             )
             #expect(refused.status == 403)
-            #expect(refused.bodyText.isEmpty, "the handler refused, with the proposed attributes in hand")
+            // The proposed attributes were in hand: `ClearanceRule` reads a resource, and the only
+            // resource here is the one the request asked to create.
+            #expect(try refused.json(AccessDenial.self).policy == "ClearanceRule")
 
             let created = try await client.post(
                 "/documents",

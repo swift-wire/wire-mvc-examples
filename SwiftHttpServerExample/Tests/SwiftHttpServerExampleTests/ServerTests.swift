@@ -329,20 +329,37 @@ struct TodosRoutingTests {
             #expect(finished.state == .completed)
             #expect(finished.summary == "the:2")
 
-            // `/documents` over a real socket. The mocked suite covers the policy tiers in detail against
-            // the in-process dispatch; what only this one adds is that the gate's response survives the
-            // transport — it is written from a middleware rather than from a route terminal, which is a
-            // different path through `WireMVCOutcome.send` and the one nothing else here drives live.
+            // `/documents` over a real socket. The mocked suite covers the policy set in detail against
+            // the in-process dispatch; what only this one adds is that a *bodied* refusal survives the
+            // transport — an `@ErrorResponse` that encodes a value rather than sending a bare status,
+            // which is a different path through `WireMVCOutcome.send`.
             let user = ["x-user": "erin"]
-            let gated = try await client.get("/documents/notes", headers: user)
-            #expect(gated.status == 403)
-            #expect(try gated.json(AccessDenial.self).policy == "SuspendedSubjectRule")
+            let suspended = try await client.get("/documents/notes", headers: user)
+            #expect(suspended.status == 403)
+            #expect(try suspended.json(AccessDenial.self).policy == "SuspendedSubjectRule")
 
-            // And the handler tier's refusal, which is bodiless — the two are told apart the same way here
-            // as everywhere else.
+            // And the resource-reading half, which could not have been decided before the document was
+            // loaded — which is what naming `ClearanceRule` asserts.
             let refused = try await client.get("/documents/sequencing", headers: ["x-user": "bob"])
             #expect(refused.status == 403)
-            #expect(refused.bodyText.isEmpty)
+            #expect(try refused.json(AccessDenial.self).policy == "ClearanceRule")
+
+            // The same refusal through the OpenAPI half, which the mocked suite cannot reach: it mounts
+            // the annotation-driven routes alone, so `/api/documents/{id}` — `DocumentsOperations`, going
+            // through the *same* `@AuthorizedDocument` — is only drivable from here. Bodied, because this
+            // operation's document declares an `AccessDenial` for its `403` where the annotated route
+            // settles for a bare status.
+            let refusedViaSpec = try await client.get("/api/documents/sequencing", headers: ["x-user": "bob"])
+            #expect(refusedViaSpec.status == 403)
+            #expect(try refusedViaSpec.json(AccessDenial.self).policy == "ClearanceRule")
+
+            let permitted = try await client.get("/api/documents/notes", headers: ["x-user": "bob"])
+            #expect(permitted.status == 200)
+            #expect(try permitted.json(Document.self).id == "notes")
+
+            // `401` from the scope failing to build, mapped by the controller's `@ErrorResponse` exactly
+            // as the annotated half's is — the two halves refuse the same way for the same reason.
+            #expect(try await client.get("/api/documents/notes").status == 401)
         }
     }
 }

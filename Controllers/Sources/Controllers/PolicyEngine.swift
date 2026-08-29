@@ -19,11 +19,11 @@ public struct AccessDenial: Codable, Sendable, Equatable {
     }
 }
 
-/// Thrown by ``PolicyEngine/authorize(_:)`` — mapped to `403` by ``DocumentsController``'s
-/// `@ErrorResponse`. Carries the denial so a handler can log it, even though the mapped response cannot:
-/// `@ErrorResponse(E.self, .status)` produces a bodiless status, so the handler tier's `403` has no body
-/// where the gate tier's does. That asymmetry is not decoration — it is how the suites tell which tier
-/// refused.
+/// Thrown by ``PolicyEngine/authorize(_:)`` and by the bindings that call it — mapped to `403` by
+/// ``DocumentsController``'s `@ErrorResponse`, in the body-returning form, so the denial reaches the
+/// caller. Naming the rule is what makes a `403` actionable for the caller, auditable for the operator,
+/// and assertable in a test: a suite can require that the *intended* rule refused rather than that
+/// something did.
 public struct AccessDenied: Error {
     public let denial: AccessDenial
 
@@ -43,14 +43,21 @@ public struct AccessDenied: Error {
 public struct PolicyEngine: Sendable {
     @Inject(AccessPolicies.all) var policies: [any AccessPolicy]
 
-    /// The gate tier's question: **is there a reason to refuse this before doing any work?**
+    /// **Is there a reason to refuse this before the resource has been loaded?**
     ///
     /// Returns a denial or nothing, and *cannot* return a permit. That is the whole contract, and it is
     /// the one thing here that would be a security bug if it were relaxed. A resource-reading rule
     /// abstains when there is no resource, so a query without one is missing an unknown number of the
-    /// rules that would have denied it; a gate that took `ReadGrant`'s permit as final would therefore
+    /// rules that would have denied it; a caller that took `ReadGrant`'s permit as final would therefore
     /// wave through exactly the requests ``ClearanceRule`` exists to stop. Undecided is the only honest
-    /// answer this tier can give, so it is the only one the signature can express.
+    /// answer at this point, so it is the only one the signature can express.
+    ///
+    /// Called by ``DocumentAuthorizer`` and ``DocumentLister`` before they read the store — the halves of
+    /// the decision are split by *which attributes they need*, not by which layer runs them. A screening
+    /// middleware could call this too, and would then refuse before the request scope is built at all;
+    /// ``DocumentsController`` explains what that buys and why the shipped shape does without it. The
+    /// contract above is what such a middleware would have to honour, and the reason this returns an
+    /// `AccessDenial?` rather than a decision.
     public func screen(
         subject: Principal,
         action: AccessAction,
@@ -97,8 +104,8 @@ public struct PolicyEngine: Sendable {
 
 // MARK: - Resolving the subject
 
-/// Where subject attributes come from — an ordinary app `@Singleton`, injected by the gate and by the
-/// request-scoped ``Caller`` alike.
+/// Where subject attributes come from — an ordinary app `@Singleton`, injected by the request-scoped
+/// ``Caller``.
 ///
 /// The fixture is a table because the interesting axis of this example is the policy set, not the identity
 /// provider. `x-user` stands in for a validated token's `sub` claim: the parity note's deferred `auth-jwt`
@@ -145,43 +152,40 @@ public struct PrincipalDirectory: Sendable {
 /// absent `x-user` fails to construct the scope, and ``DocumentsController``'s
 /// `@ErrorResponse(Unauthenticated.self, .unauthorized)` turns that into a `401`. Authentication is a
 /// binding that fails to build; authorisation is a policy decision. Keeping them in different mechanisms
-/// is what stops a gate from having to distinguish "no identity" from "identity refused" — the gate never
-/// sees the first case.
+/// is what stops any policy layer from having to distinguish "no identity" from "identity refused" — a
+/// request with no principal never reaches one.
 ///
-/// **``ScreenAccess`` resolves the same principal a second time, and cannot avoid it today.** Two separate
-/// reasons, both established by compiling the alternative rather than by reading the codegen:
+/// **Nothing resolves the principal twice**, and that is worth naming because the obvious design does.
+/// Every decision about this request — screening included — happens in a binding that already has this
+/// type, so the directory is read once, at scope entry.
+///
+/// A screening middleware would not be able to do that, which is the cost ``DocumentsController`` weighs
+/// when it explains what such a gate buys. It cannot inject ``Caller``, for two independent reasons, both
+/// established by compiling the alternative rather than by reading the codegen:
 ///
 /// - **A `@Factory` template's `@Inject` deps are resolved once, into an app `@Singleton`.** Injecting
-///   `Caller` into ``ScreenAccess`` is `error: no binding produces 'Caller'`. That is correct and
-///   permanent: `@Factory` is a lifetime of its own — the template is constructed per `create` call and is
-///   not a binding, while the factory holding its `@Inject` members is — so the members resolve where the
-///   *factory* is constructed, which is app scope. A template has no scoped form and is not supposed to.
+///   `Caller` into one is `error: no binding produces 'Caller'`. That is correct and permanent: `@Factory`
+///   is a lifetime of its own — the template is constructed per `create` call and is not a binding, while
+///   the factory holding its `@Inject` members is — so the members resolve where the *factory* is
+///   constructed, which is app scope. A template has no scoped form and is not supposed to.
 ///
-///   Writing this file is what established that, by compiling the alternative rather than reading the
-///   codegen, and it turned up a swift-wire diagnostic bug on the way: the guided note offered *scope
-///   `_WireFactory_ControllerMiddleware_screenAccess` to `@Scoped(seed:)` too*, which named a synthesised
-///   type with no declaration to annotate — and annotating the template instead was an `invalid
-///   redeclaration of 'init(…)'`, since both macros synthesise one. Fixed upstream: a scope macro beside
-///   `@Factory` is now refused outright as two lifetime macros on one declaration, and the note says what
-///   is actually true.
+///   Establishing that turned up a swift-wire diagnostic bug, since fixed: the guided note offered *scope
+///   `_WireFactory_…` to `@Scoped(seed:)` too*, which named a synthesised type with no declaration to
+///   annotate — and annotating the template instead was an `invalid redeclaration of 'init(…)'`, since
+///   both macros synthesise one. A scope macro beside `@Factory` is now refused outright as two lifetime
+///   macros on one declaration, and the note says what is actually true.
 /// - **And the ordering would defeat it anyway.** The fold is entered before `_wireEnterScope`, which
 ///   happens inside the fold's own terminal — so at the moment `create` is called there is no request
 ///   scope to construct anything in. Nor is there a channel from a middleware to the handler to carry a
 ///   resolution forward: the terminal destructures the box and discards the context.
 ///
-/// Here that costs a second dictionary read; against a real identity provider it would cost a second round
-/// trip — **which an application closes by caching the lookup, so the cost is not what wants fixing
-/// upstream.** What a framework change would buy is narrower and better: the two tiers agreeing *by
-/// construction* rather than by both happening to call the same method. They cannot diverge here, since
-/// both go through ``PrincipalDirectory/principal(presentedBy:)``, which is the mitigation an app has.
-///
-/// And "let middleware be scoped" is probably the wrong answer to it: moving the fold inside the scope
-/// costs the pre-authorisation property this gate exists for (a refusal currently skips scope construction
-/// entirely) and drops every contributed header field from the `401`. The likelier answer is to leave the
-/// gate where it is and move *authorisation* into the argument — a `RequestBound` with graph access, whose
-/// seam already sits after scope entry. wire-mvc's
+/// So a gate resolves the subject from the request itself, and the app then holds two resolutions that
+/// agree only because both go through ``PrincipalDirectory/principal(presentedBy:)``. That is a real
+/// mitigation and a real cost — one dictionary read here, one round trip against a live identity provider
+/// — and it is the sort of thing an application accepts knowingly for a pre-authorisation filter, not
+/// something an example should charge a reader by default. wire-mvc's
 /// [`ScopeAwareMiddlewareAndBindings.md`](https://github.com/tachyonics/wire-mvc/blob/main/Documentation/Notes/ScopeAwareMiddlewareAndBindings.md)
-/// carries the three candidate designs, what each costs, and the sequence.
+/// carries the candidate designs, what each cost, and the sequence.
 @Scoped(seed: HTTPRequest.self)
 public struct Caller: Sendable {
     public let principal: Principal

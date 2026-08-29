@@ -193,20 +193,68 @@ public final class DocumentStore: Sendable {
 /// `@ErrorResponse(Unauthenticated.self, .unauthorized)` maps to `401`. Every handler below therefore has
 /// a caller by construction and never checks for one.
 ///
-/// **The order of the two lines in each item handler is load-bearing, and it is load first.** There is no
-/// other order available — the resource attributes are in the document — and it has a consequence worth
-/// stating rather than discovering: a `403` from here confirms the document exists. The alternative, a
-/// `404` for anything the caller may not see, closes that channel and costs the caller the ability to tell
-/// "not there" from "not yours"; it is the right trade for a system where ids are guessable and the wrong
-/// one here, where the enumeration channel it would protect is already closed by ``list()`` filtering.
-/// Stated so that the choice is a choice.
+/// **No item handler authorises, and none can forget to.** Each one takes an already-authorised
+/// ``Document`` as an argument; loading it and deciding about it is ``DocumentAuthorizer``'s, once. What
+/// each handler used to carry was two lines whose *order* was load-bearing — load first, because the
+/// resource attributes are in the document — restated three times, with a fourth route's worth of nothing
+/// stopping a future handler from restating them wrongly or not at all. The argument is that stopped: a
+/// route that wants a `Document` gets one the only way there is.
+///
+/// The consequence of load-first is unchanged by moving it, and is still worth stating rather than
+/// discovering: a `403` from here confirms the document exists. The alternative, a `404` for anything the
+/// caller may not see, closes that channel and costs the caller the ability to tell "not there" from "not
+/// yours"; it is the right trade for a system where ids are guessable and the wrong one here, where the
+/// enumeration channel it would protect is already closed by ``list()`` filtering. Stated so that the
+/// choice is a choice.
+///
+/// ``list(documents:)`` binds too, and differently, because a collection is not an item: it filters where
+/// an item route refuses. ``create(input:)`` is the one route that still authorises in the handler, and
+/// the reason is that it has nothing to bind — it decides about a document that does not exist yet,
+/// against the attributes it *would* have.
+///
+/// ## What is required, and what is only faster
+///
+/// **The whole decision is in the bindings, and that is all correctness needs.** Each one screens the
+/// rules that need no resource, then loads, then applies the rules that read it — see
+/// ``DocumentAuthorizer``. One place per route shape, one policy set, no ordering for a handler to get
+/// wrong.
+///
+/// An earlier version of this file also folded a **controller-scope middleware** that ran
+/// ``PolicyEngine/screen(subject:action:environment:)`` from the request alone and answered `403` before
+/// anything else happened. It is not here, and it was not removed because it was wrong. Deleting it and
+/// measuring changed no status on any route: the bindings refuse the same requests, because they consult
+/// the same set. What it bought was *earlier*:
+///
+/// - **A refusal skipped scope construction entirely.** A middleware that answers puts the box in
+///   `.responded`, and `withPendingContents` is a no-op in that state, so ``Caller`` was never built. Here
+///   that is one dictionary read; against a real identity provider it is a round trip, on every request
+///   that was going to be refused anyway.
+/// - **It applied to routes that had not been written yet**, since a fold is per controller rather than
+///   per route. A new route inherits a gate; it does not inherit a binding it forgot to take.
+///
+/// Both are worth having under load, and neither is worth showing first: an example that ships the
+/// optimisation teaches the optimisation as the requirement. If you want it back, it is a `@Factory` +
+/// `@MiddlewareFactory` injecting ``PolicyEngine`` and ``PrincipalDirectory``, answering
+/// `input.respondingWith(try .json(denial, status: .forbidden))` on a denial and forwarding otherwise —
+/// and the bindings stay exactly as they are, because it can only refuse *earlier*, never differently.
+///
+/// Two things to know before adding it. It must answer **deny or undecided, never permit**, for the reason
+/// ``PolicyEngine/screen(subject:action:environment:)`` gives. And it resolves the subject a second time —
+/// a middleware's dependencies are app-scoped, so it cannot reach ``Caller`` — which is a cost the
+/// binding-only shape does not pay at all, and the reason this file no longer has a paragraph explaining
+/// how the two resolutions are kept from diverging.
 @Scoped(seed: HTTPRequest.self)
 @Controller("/documents")
-@Middleware(ControllerMiddleware.screenAccess)  // the gate: refuses what the request alone can refuse
 @ErrorResponse(Unauthenticated.self, .unauthorized)  // the scope failed to build — no known principal
-@ErrorResponse(AccessDenied.self, .forbidden)  // a policy refused, with the resource in hand
+// Bodied, so a refusal names the rule that produced it. A `403` that does not is unactionable for the
+// caller and unauditable for the operator, and — concretely — it is what lets a test assert that the
+// *intended* rule refused rather than that something did.
+@ErrorResponse(AccessDenied.self, .forbidden, { $0.denial })
 @ErrorResponse(DocumentNotFound.self, .notFound)
 public struct DocumentsController: Sendable {
+    // Only `create` still needs these, for the reason its own comment gives: it authorises a document
+    // that does not exist yet, so there is nothing to bind. Every other route takes its decision as an
+    // argument and injects nothing.
     @Inject var caller: Caller
     @Inject var documents: DocumentStore
     @Inject var policies: PolicyEngine
@@ -220,17 +268,17 @@ public struct DocumentsController: Sendable {
     /// silently, because the two answers only disagree for the callers nobody tested.
     @Get
     @JSONResponse
-    public func list() -> [Document] {
-        documents.all().filter { policies.permits(caller.query(.read, on: $0.attributes)) }
+    public func list(@AuthorizedDocuments("read") documents: [Document]) -> [Document] {
+        documents
     }
 
-    /// The **enforce** tier, at its plainest: load, authorise, answer.
+    /// The **enforce** tier, and there is nothing left of it to write. The document arrives already
+    /// authorised, because ``AuthorizedDocument`` is how one comes into existence — see it for why that
+    /// is stronger than the two lines this used to be.
     @Get("/{id}")
     @JSONResponse
-    public func read(@Path id: String) throws -> Document {
-        let document = try find(id)
-        try policies.authorize(caller.query(.read, on: document.attributes))
-        return document
+    public func read(@AuthorizedDocument("read") document: Document) -> Document {
+        document
     }
 
     /// Authorising a resource that does not exist yet, against the attributes it *would* have.
@@ -264,10 +312,11 @@ public struct DocumentsController: Sendable {
     /// attribute a rule reads, so the two are the same set and there is no second decision to make.
     @Patch("/{id}")
     @JSONResponse
-    public func edit(@Path id: String, @JSONBody input: EditDocument) throws -> Document {
-        let document = try find(id)
-        try policies.authorize(caller.query(.update, on: document.attributes))
-        guard let updated = documents.update(id: id, with: input) else { throw DocumentNotFound() }
+    public func edit(
+        @AuthorizedDocument("update") document: Document,
+        @JSONBody input: EditDocument
+    ) throws -> Document {
+        guard let updated = documents.update(id: document.id, with: input) else { throw DocumentNotFound() }
         return updated
     }
 
@@ -275,14 +324,7 @@ public struct DocumentsController: Sendable {
     /// reaches here. When it does reach here, the resource-reading rules get their turn.
     @Delete("/{id}")
     @ResponseStatus(.noContent)
-    public func delete(@Path id: String) throws {
-        let document = try find(id)
-        try policies.authorize(caller.query(.delete, on: document.attributes))
-        documents.delete(id: id)
-    }
-
-    private func find(_ id: String) throws -> Document {
-        guard let document = documents.find(id: id) else { throw DocumentNotFound() }
-        return document
+    public func delete(@AuthorizedDocument("delete") document: Document) {
+        documents.delete(id: document.id)
     }
 }
