@@ -82,8 +82,15 @@ struct StreamedUploadTests {
         #expect(receipt.read == ["a.bin": 5, "b.bin": 6], "both files reached, in order")
     }
 
-    /// The binding's failures still map, because they are raised inside the handler's first pull — before
-    /// any response head is written, which is what keeps a buffered response mode's `@ErrorResponse` in play.
+    /// Refused by the **binding**, before the handler runs at all: the terminal builds the stream and then
+    /// calls `LentBodyStream.validateRequest()`, one statement later and still inside the mapped region.
+    ///
+    /// This used to be raised from the handler's first pull, and the status was the same — on a buffered
+    /// response mode the handler runs before the head, so a late throw maps as well as an early one. The
+    /// order moved for the shape where it does not: a duplex handler runs *after* the head, where the same
+    /// deferred check truncates a response that has already claimed a status. So this test pins that
+    /// behaviour did not change; what the check happens *before* is pinned in wire-mvc's codegen tests,
+    /// which is the only place it is observable.
     @Test("a non-multipart request is refused")
     func wrongContentType() async throws {
         let response = try await withClient { client in
