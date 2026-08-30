@@ -348,6 +348,65 @@ struct TodoVerificationTests {
             }
             #expect(finished.state == .completed)
             #expect(finished.summary == "the:2")
+
+            // **Attribute-based access control, and the one feature here that costs a runtime nothing.**
+            // Every other cross-runtime capability in this repository has a seam each app must satisfy —
+            // `TodoRepository`, `SessionManager`, `JobStore` — because each of them is a database. The
+            // policy set, the engine, the bindings and the document store are all in `Controllers`, so
+            // `configure.swift` does not mention any of them and these four requests are the proof that
+            // the middleware fold and the request-scoped controller compose the same way through
+            // `WireMVCServerTransport` as they do on the native path.
+            //
+            // Every refusal names the rule that produced it, which is what these assert: not that
+            // something refused, but that the intended rule did.
+            let unauthenticated = try await execute(.GET, "/documents/notes")
+            #expect(unauthenticated.status == .unauthorized, "no principal — the scope failed to build")
+
+            // Resource-independent: a suspended account is refused from the request alone, before the
+            // store is read.
+            let suspended = try await execute(.GET, "/documents/notes", extraHeaders: ["x-user": "erin"])
+            #expect(suspended.status == .forbidden)
+            #expect(try decode(AccessDenial.self, suspended).policy == "SuspendedSubjectRule")
+
+            // The resource-reading half of the same binding: `bob`'s clearance does not reach this
+            // document's classification, which is not knowable until it is loaded. Named, so the assertion
+            // is that `ClearanceRule` refused rather than that something did.
+            let refused = try await execute(.GET, "/documents/sequencing", extraHeaders: ["x-user": "bob"])
+            #expect(refused.status == .forbidden)
+            #expect(try decode(AccessDenial.self, refused).policy == "ClearanceRule")
+
+            // Filter tier: the collection is the subset `bob` may read, not a refusal.
+            let visible = try await execute(.GET, "/documents", extraHeaders: ["x-user": "bob"])
+            #expect(visible.status == .ok)
+            #expect(try decode([Controllers.Document].self, visible).map(\.id) == ["notes"])
+
+            // **The same binding, reached from the OpenAPI half.** `/api/documents/{id}` is
+            // `DocumentsOperations`, mounted from the document rather than from `@Get`, and it authorises
+            // through the *same* `@AuthorizedDocument`. Only reachable from a runtime suite: the mocked
+            // in-process ones mount the annotation-driven routes alone.
+            let sameRule = try await execute(
+                .GET,
+                "/api/documents/sequencing",
+                extraHeaders: ["x-user": "bob"]
+            )
+            #expect(sameRule.status == .forbidden)
+            // Bodied, where the annotated route's `403` is bare — the document declares an `AccessDenial`
+            // for this operation. `ClearanceRule` reads the resource, so nothing in front of the store
+            // could have evaluated it.
+            #expect(try decode(AccessDenial.self, sameRule).policy == "ClearanceRule")
+
+            let permitted = try await execute(.GET, "/api/documents/notes", extraHeaders: ["x-user": "bob"])
+            #expect(permitted.status == .ok)
+            #expect(try decode(Controllers.Document.self, permitted).id == "notes")
+
+            // `401` from `Caller` failing to construct, mapped by the controller's `@ErrorResponse` —
+            // the same mechanism and the same binding as the annotated half above.
+            #expect(try await execute(.GET, "/api/documents/notes").status == .unauthorized)
+
+            // And the `404`, also the binding's, answered as one of the operation's own responses.
+            let absent = try await execute(.GET, "/api/documents/nothing", extraHeaders: ["x-user": "alice"])
+            #expect(absent.status == .notFound)
+            #expect(String(buffer: absent.body).contains("no such document"))
         }
     }
 }

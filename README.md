@@ -124,9 +124,48 @@ in the shared package would break the other two executables at startup.
   opened the scope, alongside the app-`@Singleton` `TodosController` in one graph. Its request-scoped
   `Session` *throws* `Unauthenticated` at scope entry when the request carries no session cookie, and
   `@ErrorResponse(Unauthenticated.self, .unauthorized)` maps that to 401 — no gate, no double-read, no
-  sentinel. A binding that fails to build maps exactly like a handler throw; gates are reserved for
-  authorization. The token→session-id mapping lives in each runtime's own database behind a
+  sentinel. A binding that fails to build maps exactly like a handler throw — and authorization does not
+  use a gate either, so the only gate left in the repository is the API-key toy above, which is there to
+  be contrasted with. The token→session-id mapping lives in each runtime's own database behind a
   `SessionManager` binding, so the same token yields the same identity across requests.
+- **Authorization as a set of bindings, not as where you put the annotation.** `/documents` is governed by
+  attribute-based access control: seven rules, each an ordinary `@Singleton` contributed to one
+  `CollectedKey<any AccessPolicy>`, combined by a `PolicyEngine` that knows none of them individually
+  (deny-overrides, then permit-required). Adding a rule to the app is adding a `@Contributes` annotation —
+  there is no registry to edit and no route to change. A role is an *attribute* rather than a permission,
+  which is what makes the model ABAC rather than RBAC: `AdministratorGrant` permits every action, and an
+  administrator is still refused a document above her clearance, because a grant is not an override.
+
+  **The decision does not fit in one tier**, and that is structural. A route-scope middleware is handed the
+  request and the route it is folded onto, but not a request-scoped binding — a `@Factory` template
+  resolves its dependencies once into an app `@Singleton`, and the fold is entered before the scope is.
+  Above all it is not handed the **resource**, which has not been loaded. So the set is consulted twice —
+  once for the rules that need no resource (a suspended account, a mutation from the external network
+  zone), once with the document in hand — and **both calls happen in the same place**: the binding that
+  produces the route's argument.
+
+  **The decision is an argument, not a line in a handler.** `GET`, `PATCH` and `DELETE` on
+  `/documents/{id}` take an already-authorised `Document`, bound by `@AuthorizedDocument("read")` — a
+  property wrapper naming a request-scoped worker that screens, loads, and authorises while producing it.
+  An item route that forgot to authorise used to compile and serve; now it cannot be written, because the
+  check is how a `Document` comes into existence. `GET /documents` binds too and *filters* rather than
+  refusing, on the same decision function, which is what stops a list from disagreeing with a read.
+  `POST /documents` is the one route that still authorises inline, and should: it decides about attributes
+  a document does not have yet, so there is nothing to bind.
+
+  A refusal names the rule that produced it, so the suites assert that `ClearanceRule` refused rather than
+  that something did. Nothing under `/documents` is bound per runtime, which makes it the one feature here
+  that costs a runtime nothing to serve.
+
+  Notably **absent**: a screening middleware. An earlier pass had one, and removing it changed no status on
+  any route — the bindings consult the same set. What it bought was a refusal *before* the request scope is
+  built, which is worth having under load and is not what a reader should meet first, so
+  `DocumentsController` documents it instead of shipping it.
+
+  The same binding also serves `GET /api/documents/{id}`, which is an OpenAPI operation rather than a
+  `@Get` route — one wrapper, declared once, used from both authoring styles. Its `403` carries the denial,
+  because that operation's document declares a body for it.
+
 - **Multipart, both directions, neither in the framework.** `GET /export` streams `multipart/mixed` **out**
   through a sender-transforming middleware (below); `POST /upload` reads `multipart/form-data` **in** through
   `@MultipartSummary`, a binding on WireMVC's `.readerBody` tier. The upload is parsed a chunk at a time,

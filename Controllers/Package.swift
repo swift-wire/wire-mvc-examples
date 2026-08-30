@@ -60,13 +60,16 @@ let package = Package(
             ],
             swiftSettings: proposalSettings
         ),
-        // Pure-logic unit tests, for the two things in this package that are not a route. Everything else
-        // here is a controller whose behaviour *is* a route, tested over the wire in each runtime's suite.
-        // The multipart parser is different — security-adjacent, with silent failure modes (a two-byte
-        // corruption of every part) and no server needed to exercise it. So is the job worker: its drain,
-        // its startup sweep and its claim ordering are properties of a `ServiceGroup` and a store, not of
-        // HTTP — observable only by running a group, and asserting the drain through a route suite would
-        // mean asserting on the suite's own teardown.
+        // Pure-logic unit tests, for the three things in this package that are not a route. Everything
+        // else here is a controller whose behaviour *is* a route, tested over the wire in each runtime's
+        // suite. The multipart parser is different — security-adjacent, with silent failure modes (a
+        // two-byte corruption of every part) and no server needed to exercise it. So is the job worker:
+        // its drain, its startup sweep and its claim ordering are properties of a `ServiceGroup` and a
+        // store, not of HTTP — observable only by running a group, and asserting the drain through a route
+        // suite would mean asserting on the suite's own teardown. And so is the policy set: an
+        // authorisation bug does not throw, it answers `200`, and it answers `200` only for the caller
+        // nobody drove a request as — so the whole caller × action × resource matrix belongs in a table
+        // here rather than in a request each.
         .testTarget(
             name: "ControllersTests",
             dependencies: [

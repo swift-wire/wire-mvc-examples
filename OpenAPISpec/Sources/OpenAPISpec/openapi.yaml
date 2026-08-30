@@ -1,6 +1,10 @@
 openapi: 3.1.0
 info:
-  title: Todos
+  # Two resources, and the second is here rather than in a document of its own because the interesting
+  # thing about it is that it is in the *same* app as `/documents` served from `@Get`/`@Patch`/`@Delete`
+  # annotations. A separate document would have proved the same code runs twice; this proves one graph
+  # serves both.
+  title: Examples
   version: 1.0.0
 # The prefix comes from here, not from the app: WireOpenAPI reads `servers:` and registers the
 # operations under it, so these sit alongside the annotation-driven `/todos` routes without colliding.
@@ -102,6 +106,47 @@ paths:
       responses:
         '204':
           description: Deleted.
+  # The authorisation example, from the document side. `DocumentsController` serves the same resource
+  # from annotations at `/documents/{id}`; this is `/api/documents/{id}`, in the same process, against the
+  # same store and the same policy set, through the same `@AuthorizedDocument` binding.
+  /documents/{id}:
+    get:
+      operationId: getDocument
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Za-z0-9-]+$'
+      responses:
+        '200':
+          description: The document, which the caller is permitted to read.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        # The scope failing to build, answered by the controller's own `@ErrorResponse` — the same `401`
+        # the annotated route gets from the same `Caller` binding. Declared here because it has to be:
+        # a controller-scope mapping's status must be one every operation on that controller describes,
+        # which is what makes the answer the document's whichever operation was asked for.
+        '401':
+          description: The request presents no known principal.
+        # The refusals below are both the *binding's*, thrown before the handler runs, and both are
+        # answered as this operation's own responses. The `403` carries the denial, where the annotated
+        # route's is bodiless — the document asked for a body, so the mapping builds one.
+        '403':
+          description: A policy refused, with the document's attributes in hand.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessDenial'
+        '404':
+          description: No such document.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
 components:
   # Declared by `$ref` on purpose: a referenced parameter has no `name` key at its use site, which is
   # what the adapter's original dictionary walk silently dropped. Reading the document with OpenAPIKit
@@ -161,4 +206,34 @@ components:
       required: [message]
       properties:
         message:
+          type: string
+    # The three fields `ResourceAttributes` reads are on the wire because a caller who may read the
+    # document may see what it was judged on. They are also the schema's, not the domain type's — the
+    # boundary is crossed in `DocumentsOperations`, exactly as it is for `Todo`.
+    Document:
+      type: object
+      required: [id, title, text, owner, department, classification]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        text:
+          type: string
+        owner:
+          type: string
+        department:
+          type: string
+        classification:
+          type: integer
+    # A named refusal. The annotated route answers `403` bodiless because `@ErrorResponse(E.self, .status)`
+    # is the shortest thing that works there; here the document declares a body, so the same `AccessDenied`
+    # produces one — which is the more useful `403` and the one a client can act on.
+    AccessDenial:
+      type: object
+      required: [policy, reason]
+      properties:
+        policy:
+          type: string
+        reason:
           type: string
