@@ -42,9 +42,14 @@ public protocol MultipartPartCursor: ~Copyable, ~Escapable {
 
 /// What the binding hands the handler: a stream to be consumed exactly once.
 ///
+/// Refines WireMVC's ``LentBodyStream``, which is where the validation step comes from: every stream the
+/// `.bodyStream` tier lends has to be able to refuse a request it cannot be produced from, before the
+/// terminal commits to a response. Nothing here re-states it — a conformer that has nothing to check
+/// inherits the default and says nothing, and this one overrides it.
+///
 /// `~Copyable` but **not** `~Escapable`, which is the one place this design is weaker than intended. See
 /// the note on `receiveStream` and swift-wire's ROADMAP.
-public protocol MultipartPartStream: ~Copyable {
+public protocol MultipartPartStream: LentBodyStream, ~Copyable {
     associatedtype Cursor: MultipartPartCursor, ~Copyable, ~Escapable
 
     /// Consume the stream, pulling parts inside `body`. Consuming rather than mutating is what makes "read
@@ -56,24 +61,44 @@ public protocol MultipartPartStream: ~Copyable {
 public struct MultipartParts<Reader: AsyncReader & ~Copyable>: ~Copyable, MultipartPartStream
 where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields? {
     private var reader: Reader
+    private let contentType: String?
     private let boundary: String?
 
     /// Built by the generated terminal, which spells `MultipartParts(request: request, reader: reader)`.
     ///
-    /// **Non-throwing on purpose.** A missing or non-multipart `Content-Type` is raised from `withParts`
-    /// instead, which keeps the failure inside the handler — still before any response head is written, so
-    /// `@ErrorResponse` maps it as it maps a decode failure. A throwing initialiser would make "the stream's
-    /// init throws" a requirement on every future lent-stream type rather than this one's choice.
+    /// **Non-throwing on purpose, and that is now a smaller claim than it was.** A throwing initialiser
+    /// would make "the stream's init throws" a requirement on every future lent-stream type rather than
+    /// this one's choice — the reason it reads the content type here and reports on it in
+    /// `validateRequest()`, one statement later in the same generated terminal. What it no longer does is
+    /// defer the check to the *handler*: that only worked while the handler ran before the head.
     public init(request: HTTPRequest, reader: consuming Reader) {
         self.reader = reader
-        self.boundary = multipartBoundary(from: request.headerFields[.contentType])
+        self.contentType = request.headerFields[.contentType]
+        self.boundary = multipartBoundary(from: contentType)
+    }
+
+    /// The `LentBodyStream` step: a body that is not `multipart/form-data` with a boundary can never
+    /// produce parts, and the request says so on its own.
+    ///
+    /// **It names the content type it saw**, which the old deferred check could not — `withParts` had only
+    /// a `nil` boundary to report by then, so every wrong content type came back
+    /// `notMultipart(contentType: nil)`. Matching what the sibling `.readerBody` binding already reports
+    /// (`MultipartSummary.bindReader`) was not the point of moving the check, but it is what falls out of
+    /// making it early rather than late.
+    public borrowing func validateRequest() throws {
+        guard boundary != nil else {
+            throw MultipartBindingError.notMultipart(contentType: contentType)
+        }
     }
 
     public consuming func withParts<T>(
         _ body: (inout MultipartCursor<Reader>) async throws -> T
     ) async throws -> T {
+        // Kept, and now unreachable through a generated route: the terminal validated before the handler
+        // was handed this. It stands for the direct caller — a test, or a hand-written builder — since the
+        // alternative is force-unwrapping a boundary on the strength of a check made somewhere else.
         guard let boundary else {
-            throw MultipartBindingError.notMultipart(contentType: nil)
+            throw MultipartBindingError.notMultipart(contentType: contentType)
         }
         var cursor = MultipartCursor(reader: reader, boundary: boundary)
         return try await body(&cursor)
