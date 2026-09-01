@@ -9,7 +9,7 @@ import PackageDescription
 //
 // It ships the document, the types swift-openapi-generator makes from it, and the `@OpenAPIController`
 // implementing them — but it does **not** run WireGen. That happens once, in each runtime executable,
-// which re-parses these sources because of the `_WireExports.swift` marker; that is what puts this spec's
+// which re-parses these sources because this target depends on the `Wire` product; that is what puts this spec's
 // aggregate proxy in the app.
 //
 // Everything below `InternalImportsByDefault`, which a module holding *public* generated code cannot have:
