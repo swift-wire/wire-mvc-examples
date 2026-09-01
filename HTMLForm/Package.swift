@@ -9,7 +9,7 @@ import PackageDescription
 // *from* `Controllers`, which is the point: the binding is framework-free and reusable, the views are not.
 //
 // It runs no code generator. Each runtime executable re-parses these sources because of the
-// `_WireExports.swift` marker, which is what puts this controller in the app's graph.
+// dependency on the `Wire` product, which is what puts this controller in the app's graph.
 let proposalSettings: [SwiftSetting] = [
     .strictMemorySafety(),
     .enableExperimentalFeature("SuppressedAssociatedTypesWithDefaults"),

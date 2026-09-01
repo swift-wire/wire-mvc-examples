@@ -118,7 +118,7 @@ let package = Package(
             ]
         ),
         // Real-backend integration suite. Re-composes the app's production graph (the plugin re-parses the
-        // app via its `_WireExports.swift` marker) — the real `CouchDB*` bindings, served through the keyless
+        // app because it depends on the `Wire` product) — the real `CouchDB*` bindings, served through the keyless
         // `@Suite(.wiremvc(.swiftHttpServer))` harness on a harness-owned server bound to an ephemeral port.
         // A container trait provisions a throwaway CouchDB; a small env trait threads its host/port into the
         // graph's `provideCouchDBClient` before the harness bootstraps. Depending on `WireMVCTesting` makes the
