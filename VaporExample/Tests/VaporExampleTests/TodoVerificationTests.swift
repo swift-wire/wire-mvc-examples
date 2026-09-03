@@ -123,7 +123,7 @@ struct TodoVerificationTests {
             )
 
             // get by @Path id, missing — the handler throws TodoNotFound; @ErrorResponse maps it to 404
-            // (M5.4E use-case-2, a handler throw), not the baseline 500.
+            // (an `@ErrorResponse`-mapped handler throw), not the baseline 500.
             let missing = try await execute(.GET, "/todos/does-not-exist")
             #expect(missing.status == .notFound)
 
@@ -148,7 +148,7 @@ struct TodoVerificationTests {
             //
             // Everything above reached `/todos` through `@Get`/`@Post`. These reach `/api/todos` through
             // an OpenAPI document, and read the todos the annotation-driven routes just wrote — one
-            // `TodoRepository` binding (here MongoDB) serves both, because after M6d an operation *is* a
+            // `TodoRepository` binding (here MongoDB) serves both, because an operation *is* a
             // WireMVC route. `configure.swift` is unchanged: `WireMVCServerTransport.apply` already
             // registers every collated contributor, so a second adapter needs nothing added.
             //

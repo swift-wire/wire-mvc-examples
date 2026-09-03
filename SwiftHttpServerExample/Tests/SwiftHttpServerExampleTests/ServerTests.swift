@@ -171,7 +171,7 @@ struct TodosRoutingTests {
             //
             // Everything above reached `/todos` through `@Get`/`@Post`. These reach `/api/todos` through an
             // OpenAPI document, and read the todos the annotation-driven routes just wrote — one
-            // `TodoRepository` binding (here CouchDB) serves both, because after M6d an operation *is* a
+            // `TodoRepository` binding (here CouchDB) serves both, because an operation *is* a
             // WireMVC route. Here they register *natively*, onto the trie builder, where the other two
             // runtimes reach the same routes through the `WireMVCServerTransport` bridge.
             //

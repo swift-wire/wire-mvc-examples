@@ -52,7 +52,7 @@ in the shared package would break the other two executables at startup.
   `TodoRepository` binding** — so an operation reads what a `@Post` route wrote, and a todo created
   through the document is read back through the annotation-driven route. Each suite asserts exactly
   that. Nothing in any app's assembly mentions OpenAPI: `apply` already registers every collated
-  contributor, because after M6d an operation *is* a WireMVC route. The `/api` prefix comes from the
+  contributor, because an operation *is* a WireMVC route. The `/api` prefix comes from the
   document's `servers:` block, not from the app.
 
   Two consequences worth copying. The executables use the **decomposed three-plugin form**

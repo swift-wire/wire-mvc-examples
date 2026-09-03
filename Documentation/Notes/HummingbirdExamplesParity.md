@@ -491,7 +491,7 @@ tier — the producer runs after the handler returns, so it cannot hold a lent c
    the two compose, and that migration may surface a real constraint rather than being mechanical. Ordering
    it second means a failure there doesn't also cost the tier its second client.
 
-3. **Spike a lending tier** — in `swift-wire-spikes`, the way spike-14 proved the ServerTransport bridge, not
+3. **Spike a lending tier** — in `swift-wire-spikes`, the way a spike proved the ServerTransport bridge, not
    in `wire-mvc`. Take the streaming-tier note's two open questions in the **opposite** order to how they are
    listed there: the ownership question (can a `~Escapable` writer cross into a user method while a lent
    cursor is live) before the ergonomic one (the user-written `W: CallerAsyncWriter & ~Copyable & ~Escapable`
