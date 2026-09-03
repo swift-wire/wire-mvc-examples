@@ -12,7 +12,7 @@ public typealias Schemas = Components.Schemas
 ///
 /// This is the point of the package. `TodosController` in `Controllers` and this type serve the same data
 /// from the same `TodoRepository` binding, under the same router, middleware and error tiers, in the same
-/// app. After M6d an operation *is* a WireMVC route, so an app does not have two of everything — and that
+/// app. An operation *is* a WireMVC route, so an app does not have two of everything — and that
 /// claim is only worth making where a user can see both halves running side by side.
 ///
 /// Generic over the repository for the same reason `TodosController` is: `some TodoRepository` cannot be

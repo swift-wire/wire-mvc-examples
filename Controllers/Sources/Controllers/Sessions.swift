@@ -7,7 +7,7 @@ public import WireMVC
 /// The app-`@Singleton` session store — one per app, shared across every request. Each runtime binds its
 /// own `@Singleton(as: SessionManager.self)` backend against its database (the same opaque-lift pattern as
 /// `TodoRepository`), so the token→session-id mapping lives in that runtime's real store. The request-scoped
-/// `Session` *borrows* it (the M5.4 capture-dep) and resolves the token to a **stable** id: the same token
+/// `Session` *borrows* it (the request-scope capture-dep) and resolves the token to a **stable** id: the same token
 /// yields the same id across requests because the store persists it. Declared here (framework-free) but not
 /// satisfied here — each executable supplies the DB-backed implementation.
 public protocol SessionManager: Sendable {
@@ -15,10 +15,10 @@ public protocol SessionManager: Sendable {
     func sessionID(for token: String) async throws -> String
 }
 
-// The M5.4 request-scoped-controller case, portable across every runtime. A `@Scoped(seed:) @Controller`
+// The request-scoped-controller case, portable across every runtime. A `@Scoped(seed:) @Controller`
 // is constructed fresh per request from the request seed (the bridge proxy's `_wireEnterScope` thunk),
 // injecting a request-scoped `Session` built from that same request — alongside the app-`@Singleton`
-// `TodosController` in one graph. **Authentication is throw-at-scope-construction (M5.4E):** the `Session`
+// `TodosController` in one graph. **Authentication is throw-at-scope-construction:** the `Session`
 // binding *throws* `Unauthenticated` at scope entry when the `x-session` header is absent, and `MeController`
 // declares `@ErrorResponse(Unauthenticated.self, .unauthorized)` — the generated terminal enters the scope
 // inside its `catch`, so the throw maps to 401. No gate, no double-read, no sentinel: a request-scoped
@@ -116,7 +116,7 @@ public struct MeController<Repository: TodoRepository, Manager: SessionManager>:
     @Inject var session: Session<Manager>  // request-scoped, generic over the opaque store
     // The app's opaque-lifted backend (`@Singleton(as: TodoRepository.self)`, `some TodoRepository`),
     // injected as a lifted generic parameter — the same portable shape `TodosController` uses. A
-    // request-scoped controller *borrowing* the shared app backend is the idiomatic M5.4 case.
+    // request-scoped controller *borrowing* the shared app backend is the idiomatic request-scope case.
     @Inject var repository: Repository
 
     @Get
