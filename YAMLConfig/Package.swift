@@ -1,4 +1,7 @@
 // swift-tools-version: 6.4
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 the swift-wire project authors
+
 import PackageDescription
 
 // Both ends of the extension point, in one package and around one codec: `@YAMLBody` binds a YAML request

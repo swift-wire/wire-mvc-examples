@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 the swift-wire project authors
+
 import AsyncHTTPClient
 // `package` because `CouchDBError.status` is a `package` declaration of a type from here — under
 // `InternalImportsByDefault` a plain `import` makes that an error.

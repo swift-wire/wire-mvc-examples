@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 the swift-wire project authors
+
 // Full Foundation, not the `canImport(FoundationEssentials)` guard used elsewhere in this package, for
 // the same reason `AssetsController` states: `removingPercentEncoding` is not in FoundationEssentials,
 // so the guard resolves to the lighter module on Linux and the API is absent — compiling on macOS and

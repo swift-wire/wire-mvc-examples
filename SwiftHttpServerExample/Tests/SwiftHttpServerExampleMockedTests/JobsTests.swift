@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 the swift-wire project authors
+
 import Controllers
 // `MemberImportVisibility`: this file names `HTTPField.Name.location`, so it imports the module that
 // declares it rather than relying on one reaching it transitively.

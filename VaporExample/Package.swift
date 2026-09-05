@@ -1,4 +1,7 @@
 // swift-tools-version: 6.4
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 the swift-wire project authors
+
 import PackageDescription
 
 // Runtime 2: Vapor — proposal-native. Serves the shared (framework-free) controllers via the opt-in

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 the swift-wire project authors
+
 import Vapor
 
 // A thin serving entry point — the average Vapor app's `main`: detect the environment, build the
