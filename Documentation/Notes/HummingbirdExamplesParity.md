@@ -120,7 +120,7 @@ Streaming request bodies were *not* part of that ceiling — see the first work 
    the registry left a class, compiles and is **unsound**, since that type's precondition is that the
    stored value is never aliased — true of a linear reader or sender by construction, false of a class
    reference. wire-mvc's
-   [`LinearResponseHeaderRegistry.md`](https://github.com/tachyonics/wire-mvc/blob/main/Documentation/Notes/LinearResponseHeaderRegistry.md)
+   [`LinearResponseHeaderRegistry.md`](https://github.com/swift-wire/wire-mvc/blob/main/Documentation/Notes/LinearResponseHeaderRegistry.md)
    records the design, the four places the plan turned out to be wrong, and the measurement: **six
    allocations and 1536 bytes per request**, on a case where the registry genuinely escapes.
 
@@ -323,7 +323,7 @@ Streaming request bodies were *not* part of that ceiling — see the first work 
    The answer moved *authorisation* into the argument: a request binding with graph access, whose seam
    already sits **after** scope entry in every generated route, so it needed no reordering at all. Written
    up, with the candidate designs and the sequence, in wire-mvc's
-   [`ScopeAwareMiddlewareAndBindings.md`](https://github.com/tachyonics/wire-mvc/blob/main/Documentation/Notes/ScopeAwareMiddlewareAndBindings.md).
+   [`ScopeAwareMiddlewareAndBindings.md`](https://github.com/swift-wire/wire-mvc/blob/main/Documentation/Notes/ScopeAwareMiddlewareAndBindings.md).
 
    **That sequence has now shipped and this file consumes it.** Route identity on the box (which struck the
    first finding above), `@Factory` named and diagnosed as a lifetime (which struck the diagnostic bug), a
@@ -468,7 +468,7 @@ Streaming request bodies were *not* part of that ceiling — see the first work 
 Independent of the parity track: neither blocks the other, and they touch different seams. This one exists
 because a route that reads its request body *while* writing its response cannot be expressed on any typed
 tier — the producer runs after the handler returns, so it cannot hold a lent cursor. See
-[wire-mvc's *The shape this tier does not reach: lending the writer*](https://github.com/tachyonics/wire-mvc/blob/main/Documentation/Notes/StreamingResponseTier.md).
+[wire-mvc's *The shape this tier does not reach: lending the writer*](https://github.com/swift-wire/wire-mvc/blob/main/Documentation/Notes/StreamingResponseTier.md).
 
 1. **The `response-body-processing` echo, as a `@RawRoute`.** The smallest item and the gating one. It
    answers the open runtime question above — whether Hummingbird and Vapor tolerate a request body being

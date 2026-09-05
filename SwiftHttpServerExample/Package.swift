@@ -36,7 +36,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0"),
         // `@ConfigProperty` — reads a value at the injection site, so a provider depends on the value
         // rather than on a reader it has to call.
-        .package(url: "https://github.com/tachyonics/wire-configuration.git", branch: "main"),
+        .package(url: "https://github.com/swift-wire/wire-configuration.git", branch: "main"),
         .package(path: "../OpenAPISpec"),
         // The `html-form` example. A sibling package because it depends on Elementary and `Controllers`
         // deliberately does not — same reason `OpenAPISpec` is one. Its `Elementary` trait request on wire-mvc
@@ -49,9 +49,9 @@ let package = Package(
         // `NIOHTTPServer` switches on WireMVCTesting's `NIOHTTPServer: WireMVCTestServer` conformance and
         // the `.swiftHttpServer` suite mode. Off by default in wire-mvc, so a consumer that doesn't serve on
         // NIO resolves no server package at all — this runtime does, so it opts in.
-        .package(url: "https://github.com/tachyonics/wire-mvc.git", branch: "main", traits: ["NIOHTTPServer"]),
-        .package(url: "https://github.com/tachyonics/swift-wire.git", branch: "main"),
-        .package(url: "https://github.com/tachyonics/wire-open-api.git", branch: "main"),
+        .package(url: "https://github.com/swift-wire/wire-mvc.git", branch: "main", traits: ["NIOHTTPServer"]),
+        .package(url: "https://github.com/swift-wire/swift-wire.git", branch: "main"),
+        .package(url: "https://github.com/swift-wire/wire-open-api.git", branch: "main"),
         .package(url: "https://github.com/swift-server/swift-http-server.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-http-api-proposal.git", .upToNextMinor(from: "0.2.0")),
         .package(

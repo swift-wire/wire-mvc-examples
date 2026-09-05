@@ -187,7 +187,7 @@ public struct PrincipalDirectory: Sendable {
 /// mitigation and a real cost — one dictionary read here, one round trip against a live identity provider
 /// — and it is the sort of thing an application accepts knowingly for a pre-authorisation filter, not
 /// something an example should charge a reader by default. wire-mvc's
-/// [`ScopeAwareMiddlewareAndBindings.md`](https://github.com/tachyonics/wire-mvc/blob/main/Documentation/Notes/ScopeAwareMiddlewareAndBindings.md)
+/// [`ScopeAwareMiddlewareAndBindings.md`](https://github.com/swift-wire/wire-mvc/blob/main/Documentation/Notes/ScopeAwareMiddlewareAndBindings.md)
 /// carries the candidate designs, what each cost, and the sequence.
 @Scoped(seed: HTTPRequest.self)
 public struct Caller: Sendable {

@@ -33,9 +33,9 @@ let package = Package(
         // `HTMLForm` covers the streaming one.
         .package(path: "../YAMLConfig"),
         .package(path: "../OpenAPISpec"),
-        .package(url: "https://github.com/tachyonics/wire-mvc.git", branch: "main", traits: ["ServerTransport"]),
-        .package(url: "https://github.com/tachyonics/swift-wire.git", branch: "main"),
-        .package(url: "https://github.com/tachyonics/wire-open-api.git", branch: "main"),
+        .package(url: "https://github.com/swift-wire/wire-mvc.git", branch: "main", traits: ["ServerTransport"]),
+        .package(url: "https://github.com/swift-wire/swift-wire.git", branch: "main"),
+        .package(url: "https://github.com/swift-wire/wire-open-api.git", branch: "main"),
         .package(url: "https://github.com/vapor/vapor.git", from: "4.106.0"),
         .package(url: "https://github.com/swift-server/swift-openapi-vapor.git", from: "1.0.0"),
         .package(url: "https://github.com/orlandos-nl/MongoKitten.git", from: "7.0.0"),
@@ -43,7 +43,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0"),
         // `@ConfigProperty` — reads a value at the injection site, so a provider depends on the value
         // rather than on a reader it has to call.
-        .package(url: "https://github.com/tachyonics/wire-configuration.git", branch: "main"),
+        .package(url: "https://github.com/swift-wire/wire-configuration.git", branch: "main"),
         .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.0.0"),
     ],
     targets: [

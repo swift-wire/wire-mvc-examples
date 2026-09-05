@@ -27,7 +27,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0"),
         // `@ConfigProperty` — reads a value at the injection site, so a provider depends on the value
         // rather than on a reader it has to call.
-        .package(url: "https://github.com/tachyonics/wire-configuration.git", branch: "main"),
+        .package(url: "https://github.com/swift-wire/wire-configuration.git", branch: "main"),
         // The `html-form` example. A sibling package because it depends on Elementary and `Controllers`
         // deliberately does not; its `Elementary` trait request on wire-mvc unions with this runtime's
         // `ServerTransport` one. Here it also demonstrates that a streamed `@HTMLResponse` reaches the
@@ -38,9 +38,9 @@ let package = Package(
         // `HTMLForm` covers the streaming one.
         .package(path: "../YAMLConfig"),
         .package(path: "../OpenAPISpec"),
-        .package(url: "https://github.com/tachyonics/wire-mvc.git", branch: "main", traits: ["ServerTransport"]),
-        .package(url: "https://github.com/tachyonics/swift-wire.git", branch: "main"),
-        .package(url: "https://github.com/tachyonics/wire-open-api.git", branch: "main"),
+        .package(url: "https://github.com/swift-wire/wire-mvc.git", branch: "main", traits: ["ServerTransport"]),
+        .package(url: "https://github.com/swift-wire/swift-wire.git", branch: "main"),
+        .package(url: "https://github.com/swift-wire/wire-open-api.git", branch: "main"),
         .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0"),
         .package(url: "https://github.com/swift-server/swift-openapi-hummingbird.git", from: "2.0.0"),
         .package(url: "https://github.com/valkey-io/valkey-swift.git", from: "1.0.0"),

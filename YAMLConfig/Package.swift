@@ -34,8 +34,8 @@ let package = Package(
         .library(name: "YAMLConfig", targets: ["YAMLConfig"])
     ],
     dependencies: [
-        .package(url: "https://github.com/tachyonics/wire-mvc.git", branch: "main"),
-        .package(url: "https://github.com/tachyonics/swift-wire.git", branch: "main"),
+        .package(url: "https://github.com/swift-wire/wire-mvc.git", branch: "main"),
+        .package(url: "https://github.com/swift-wire/swift-wire.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-http-types.git", from: "1.6.0"),
         .package(url: "https://github.com/jpsim/Yams.git", from: "6.0.0"),
     ],
