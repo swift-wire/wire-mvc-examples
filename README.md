@@ -92,3 +92,11 @@ doubles with smockable. The controllers are annotated `@TestScopable` for it —
 production, rebuilt per request under a keyed suite, which is what makes an app-scoped route mockable
 per test. It keeps the bundled `WireMVCBuildPlugin`: with no OpenAPI dependency there is nothing for a
 second adapter to generate.
+
+## Licence
+
+Apache-2.0. See [LICENSE](LICENSE).
+
+**These samples are meant to be copied.** You may take this code into your own projects without
+attribution and without reproducing the licence header. The Apache-2.0 terms cover the repository as
+a whole; they are not intended to attach to a handful of lines lifted to get something started.
