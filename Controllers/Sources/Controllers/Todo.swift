@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 the wire-mvc-examples project authors
+
 /// A todo item. Plain `Codable` — the controllers and repository are framework-free.
 public struct Todo: Codable, Sendable, Equatable {
     public let id: String

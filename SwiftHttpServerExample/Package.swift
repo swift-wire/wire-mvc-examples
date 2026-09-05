@@ -1,4 +1,7 @@
 // swift-tools-version: 6.4
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 the wire-mvc-examples project authors
+
 import PackageDescription
 
 // Runtime 3: the swift-http-api-proposal server, via swift-server's concrete `NIOHTTPServer`. Serves

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 the wire-mvc-examples project authors
+
 public import WireMVCElementary
 
 /// The view. A concrete `HTMLDocument` rather than `some HTML`, because both routes return it and a

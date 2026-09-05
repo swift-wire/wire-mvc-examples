@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 the wire-mvc-examples project authors
+
 // Unconditional, and deliberately not behind `#if canImport(FoundationEssentials)` — the same call
 // `FormBody` makes two files over, for the same reason. `trimmingCharacters(in:)` and `CharacterSet` are
 // **full**-Foundation, and that guard is asymmetric: false on macOS, so the whole module is imported and

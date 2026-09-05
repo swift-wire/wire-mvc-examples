@@ -1,4 +1,7 @@
 // swift-tools-version: 6.4
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 the wire-mvc-examples project authors
+
 import PackageDescription
 
 // The `html-form` example: render a form, POST it back, re-render with validation errors.

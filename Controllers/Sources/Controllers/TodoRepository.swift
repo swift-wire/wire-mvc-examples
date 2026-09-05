@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 the wire-mvc-examples project authors
+
 /// The persistence boundary the controller depends on. Declared here (framework-free), *not*
 /// satisfied here — each runtime executable binds its own `@Singleton(as: TodoRepository.self)`
 /// backend. `async` so a real database backend fits the same protocol as the in-memory one.

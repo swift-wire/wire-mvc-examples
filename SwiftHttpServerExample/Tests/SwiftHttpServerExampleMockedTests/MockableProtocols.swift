@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 the wire-mvc-examples project authors
+
 package import Controllers
 import Smockable
 import Testing  // the @Smock-generated verifier references Testing::SourceLocation (module-qualified)

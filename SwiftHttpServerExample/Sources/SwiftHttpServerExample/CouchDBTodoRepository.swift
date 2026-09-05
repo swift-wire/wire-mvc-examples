@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 the wire-mvc-examples project authors
+
 package import Controllers
 // `MemberImportVisibility`: this file reads `HTTPResponse.Status` members, so it must import their
 // defining module itself rather than relying on one reaching it transitively.

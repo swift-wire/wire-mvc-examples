@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 the wire-mvc-examples project authors
+
 // Unconditional, deliberately. Elsewhere in this package a `#if canImport(FoundationEssentials)` guard is
 // fine because those files use only APIs present in both modules (`JSONEncoder`). `CharacterSet` and the
 // percent-encoding string APIs are full-Foundation only, so the same guard compiles on macOS and fails on

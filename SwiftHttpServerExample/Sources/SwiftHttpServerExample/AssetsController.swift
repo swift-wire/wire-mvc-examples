@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 the wire-mvc-examples project authors
+
 // Full Foundation, not the `canImport(FoundationEssentials)` guard used elsewhere in this package:
 // `removingPercentEncoding` is not in FoundationEssentials, so the guard resolves to the lighter module
 // on Linux and the API is absent — which compiles on macOS and fails in CI.
