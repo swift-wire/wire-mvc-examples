@@ -139,3 +139,14 @@ jobs:
       - name: SwiftLint
         working-directory: ${{ matrix.package }}
         run: swiftlint lint --quiet
+
+  LicenceHeaders:
+    name: Licence headers
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      # Pure git and shell, so this gate needs no toolchain and answers in seconds. It is a
+      # separate job rather than a step on an existing one because a missing header is not a
+      # build error: nothing else in the toolchain looks, so without this the omission is silent.
+      - name: Check SPDX headers
+        run: ./Scripts/check-license-headers.sh
