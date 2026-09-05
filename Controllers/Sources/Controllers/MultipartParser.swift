@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright (c) 2026 the wire-mvc-examples project authors
+// Copyright (c) 2026 the swift-wire project authors
 
 // Unconditional, and deliberately not behind `#if canImport(FoundationEssentials)` — the same call
 // `FormBody` makes two files over, for the same reason. `trimmingCharacters(in:)` and `CharacterSet` are
