@@ -1,6 +1,6 @@
 # wire-mvc-examples
 
-Cross-runtime examples for [WireMVC](https://github.com/tachyonics/wire-mvc). The point of the
+Cross-runtime examples for [WireMVC](https://github.com/swift-wire/wire-mvc). The point of the
 repo *is* the layout: one framework-free package of controllers, and a separate package per
 runtime that assembles the **same** controller source onto a different HTTP stack.
 
@@ -65,7 +65,7 @@ Hummingbird does not percent-decode path parameters, and a **catch-all route ser
 runtime only** — which is why `SwiftHttpServerExample` owns `AssetsController` rather than
 `Controllers` doing so. The full matrix, and which differences are convention rather than
 capability, is in
-[wire-mvc's documentation](https://github.com/tachyonics/wire-mvc#what-differs-by-runtime).
+[wire-mvc's documentation](https://github.com/swift-wire/wire-mvc#what-differs-by-runtime).
 
 ## Running
 

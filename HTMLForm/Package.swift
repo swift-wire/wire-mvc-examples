@@ -35,11 +35,11 @@ let package = Package(
     dependencies: [
         .package(path: "../Controllers"),
         .package(
-            url: "https://github.com/tachyonics/wire-mvc.git",
+            url: "https://github.com/swift-wire/wire-mvc.git",
             branch: "main",
             traits: ["Elementary"]
         ),
-        .package(url: "https://github.com/tachyonics/swift-wire.git", branch: "main"),
+        .package(url: "https://github.com/swift-wire/swift-wire.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-http-types.git", from: "1.6.0"),
         // Redundant on its face — wire-mvc already depends on the fork at this exact revision, and this
         // package needs no other pin. It is here because SwiftPM will not resolve a *revision*-pinned

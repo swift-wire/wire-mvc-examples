@@ -40,13 +40,13 @@ let package = Package(
         // The domain: `TodoRepository` and `Todo` come from the shared controllers package, so both
         // authoring styles serve the same backend rather than each carrying its own model.
         .package(path: "../Controllers"),
-        .package(url: "https://github.com/tachyonics/wire-open-api.git", branch: "main"),
+        .package(url: "https://github.com/swift-wire/wire-open-api.git", branch: "main"),
         .package(
-            url: "https://github.com/tachyonics/wire-mvc.git",
+            url: "https://github.com/swift-wire/wire-mvc.git",
             branch: "main",
             traits: ["ServerTransport"]
         ),
-        .package(url: "https://github.com/tachyonics/swift-wire.git", branch: "main"),
+        .package(url: "https://github.com/swift-wire/swift-wire.git", branch: "main"),
         // **A fork, pinned to a revision.** WireOpenAPI dispatches each operation individually by calling
         // the generated per-operation method on `UniversalServer`, which stock swift-openapi-generator
         // emits `fileprivate`; the fork lets it follow the configured access modifier. Pinned rather than

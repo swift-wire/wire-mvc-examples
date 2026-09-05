@@ -33,11 +33,11 @@ let package = Package(
         .library(name: "Controllers", targets: ["Controllers"])
     ],
     dependencies: [
-        .package(url: "https://github.com/tachyonics/wire-mvc.git", branch: "main"),
+        .package(url: "https://github.com/swift-wire/wire-mvc.git", branch: "main"),
         // `Logger` appears in MeController's injected surface. Named explicitly rather than relied on
         // transitively; this package still names no *logging target*, so consumers keep that choice.
         .package(url: "https://github.com/apple/swift-log.git", from: "1.14.0"),
-        .package(url: "https://github.com/tachyonics/swift-wire.git", branch: "main"),
+        .package(url: "https://github.com/swift-wire/swift-wire.git", branch: "main"),
         // The `@RawRoute` streaming route touches the proposal's raw HTTP primitives directly
         // (`HTTPResponseSender`, `HTTPResponse`, `HTTPFields`, `UniqueArray`) — inherent to a raw
         // handler. Still framework-free: these are the proposal's HTTP types, not Hummingbird/Vapor.
