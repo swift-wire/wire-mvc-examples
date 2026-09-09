@@ -1,5 +1,5 @@
 {
-  "originHash" : "e356098a847cf9e7d9183309b4c984a9702dcdbdfe0188f1b23f4df1a3d0da17",
+  "originHash" : "1c1c61ec49d8512e99c873ca960410bc29ab0d5bacbe515e668872ac4cbe87a4",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -338,7 +338,7 @@
       "location" : "https://github.com/swift-wire/swift-wire.git",
       "state" : {
         "branch" : "main",
-        "revision" : "0da5f330e4d56224c0e06cc3f2418ff542baec10"
+        "revision" : "fc8d486479230a8033c68a43a0637861a0878b91"
       }
     },
     {
@@ -347,7 +347,7 @@
       "location" : "https://github.com/swift-wire/wire-configuration.git",
       "state" : {
         "branch" : "main",
-        "revision" : "c180fdc2ebc118a00cab4a187c9dc40cdc1a143d"
+        "revision" : "2fbaaaac82e34b59d4ac2ed48b07671cf0d77845"
       }
     },
     {
@@ -356,7 +356,7 @@
       "location" : "https://github.com/swift-wire/wire-mvc.git",
       "state" : {
         "branch" : "main",
-        "revision" : "62f869ca0fc99082d8ae8473a9f3f3e9c78d87da"
+        "revision" : "e90de87129ed5edcdfc64331dcc06e1776dbd149"
       }
     },
     {
@@ -365,7 +365,7 @@
       "location" : "https://github.com/swift-wire/wire-open-api.git",
       "state" : {
         "branch" : "main",
-        "revision" : "383bfeed0d864b154be549f9d7d8747b50da0c8e"
+        "revision" : "7624b5adc6bb1456ac5a0861a17079772075dabd"
       }
     },
     {
