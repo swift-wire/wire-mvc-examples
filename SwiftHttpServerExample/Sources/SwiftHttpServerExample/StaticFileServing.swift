@@ -117,7 +117,7 @@ package struct ServeStaticFiles<
     Sender: HTTPResponseSender & ~Copyable
 >: Middleware
 where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields?, Sender.Writer: ~Copyable {
-    @Inject var store: StaticFileStore
+    @Inject let store: StaticFileStore
 
     package typealias Input = RequestResponseMiddlewareBox<Ctx, Reader, Sender>
     package typealias NextInput = Input

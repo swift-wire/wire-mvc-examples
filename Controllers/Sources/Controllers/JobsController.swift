@@ -22,7 +22,7 @@ public import WireMVC
 @ErrorResponse(QueueClosed.self, .serviceUnavailable)
 @ErrorResponse(JobNotFound.self, .notFound)
 public struct JobsController<Processor: JobProcessor>: Sendable {
-    @Inject var jobs: Processor
+    @Inject let jobs: Processor
 
     /// Accept work and say so. **`202`, not `201`**: a `201` promises a resource exists at `Location`,
     /// and nothing has been created here except a record of the intention — RFC 9110 §15.3.3 is explicit

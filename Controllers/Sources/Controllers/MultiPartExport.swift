@@ -240,7 +240,7 @@ where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields?, Sender.Wr
 @Singleton
 @Controller("/export")
 public struct ExportController<Repository: TodoRepository>: Sendable {
-    @Inject var repository: Repository
+    @Inject let repository: Repository
 
     /// The **producer tier**. The handler returns parts; `MultiPartProducer` frames them and the terminal
     /// owns the sender. Multipart framing is a codec, and this is what saying so looks like.

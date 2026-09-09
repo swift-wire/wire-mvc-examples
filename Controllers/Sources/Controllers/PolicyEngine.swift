@@ -44,7 +44,7 @@ public struct AccessDenied: Error {
 /// is that no rule permits.
 @Singleton
 public struct PolicyEngine: Sendable {
-    @Inject(AccessPolicies.all) var policies: [any AccessPolicy]
+    @Inject(AccessPolicies.all) let policies: [any AccessPolicy]
 
     /// **Is there a reason to refuse this before the resource has been loaded?**
     ///

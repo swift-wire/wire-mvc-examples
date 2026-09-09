@@ -48,9 +48,9 @@ public struct AuthorizedDocument {
 public struct DocumentAuthorizer: ScopedRequestBound {
     public typealias Value = Document
 
-    @Inject var documents: DocumentStore
-    @Inject var policies: PolicyEngine
-    @Inject var caller: Caller
+    @Inject let documents: DocumentStore
+    @Inject let policies: PolicyEngine
+    @Inject let caller: Caller
 
     public func bind(
         name: String,
@@ -126,9 +126,9 @@ public struct AuthorizedDocuments {
 public struct DocumentLister: ScopedRequestBound {
     public typealias Value = [Document]
 
-    @Inject var documents: DocumentStore
-    @Inject var policies: PolicyEngine
-    @Inject var caller: Caller
+    @Inject let documents: DocumentStore
+    @Inject let policies: PolicyEngine
+    @Inject let caller: Caller
 
     public func bind(
         name: String,

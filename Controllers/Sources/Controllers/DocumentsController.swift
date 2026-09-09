@@ -258,9 +258,9 @@ public struct DocumentsController: Sendable {
     // Only `create` still needs these, for the reason its own comment gives: it authorises a document
     // that does not exist yet, so there is nothing to bind. Every other route takes its decision as an
     // argument and injects nothing.
-    @Inject var caller: Caller
-    @Inject var documents: DocumentStore
-    @Inject var policies: PolicyEngine
+    @Inject let caller: Caller
+    @Inject let documents: DocumentStore
+    @Inject let policies: PolicyEngine
 
     /// The **filter** tier. A caller asking for the collection is not asking a question that can be
     /// refused — the answer is the subset they may read, and for a caller who may read none of it that is

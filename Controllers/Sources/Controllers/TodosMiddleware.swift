@@ -56,8 +56,8 @@ public struct AuditGate<
     Repository: TodoRepository
 >: Middleware
 where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields?, Sender.Writer: ~Copyable {
-    @Inject var log: AuditLog
-    @Inject var repository: Repository
+    @Inject let log: AuditLog
+    @Inject let repository: Repository
 
     public typealias Input = RequestResponseMiddlewareBox<Ctx, Reader, Sender>
     public typealias NextInput = Input
@@ -109,7 +109,7 @@ public struct RequireAPIKey<
     Sender: HTTPResponseSender & ~Copyable
 >: Middleware
 where Reader.ReadElement == UInt8, Reader.FinalElement == HTTPFields?, Sender.Writer: ~Copyable {
-    @Inject var keys: APIKeyStore
+    @Inject let keys: APIKeyStore
 
     public typealias Input = RequestResponseMiddlewareBox<Ctx, Reader, Sender>
     public typealias NextInput = Input
