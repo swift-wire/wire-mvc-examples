@@ -27,7 +27,7 @@ public typealias Schemas = Components.Schemas
 // sources, but which document they implement is settled here, not there.
 @OpenAPIController
 public struct TodosOperations<Repository: TodoRepository>: Sendable {
-    @Inject var repository: Repository
+    @Inject let repository: Repository
 
     /// The typed shim: parameters bound by WireMVC's own property wrappers, and the response built from
     /// the one success the document declares. Nothing here names `Operations.ListTodos.Input`.

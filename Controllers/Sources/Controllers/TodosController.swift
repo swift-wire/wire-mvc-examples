@@ -23,7 +23,7 @@ public import WireMVC
 @Middleware(ControllerMiddleware.audit)  // controller-scope, generic-with-deps, non-canonical parameter order
 @ErrorResponse(TodoNotFound.self, .notFound)  // handler throw (use-case-2) → 404, not the baseline 500
 public struct TodosController<Repository: TodoRepository>: Sendable {
-    @Inject var repository: Repository
+    @Inject let repository: Repository
 
     /// `@Query completed` filters and the `x-limit` `@Header` caps the count — both optional (via
     /// Swift-native defaults) and both `LosslessStringConvertible`-converted, so a bare `GET /todos`

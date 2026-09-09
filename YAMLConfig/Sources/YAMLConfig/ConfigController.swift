@@ -57,7 +57,7 @@ public actor SettingsStore {
 @Singleton
 @Controller("/config")
 public struct ConfigController: Sendable {
-    @Inject private var store: SettingsStore
+    @Inject private let store: SettingsStore
 
     /// YAML out. `@YAMLResponse` is a mode declared in this module — the generated terminal encodes through
     /// `YAMLCodec` and takes the content type from it.

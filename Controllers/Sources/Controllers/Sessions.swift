@@ -115,12 +115,12 @@ public struct MeController<Repository: TodoRepository, Manager: SessionManager>:
     // library that depended on one would force that choice on every consumer — and the same source serves
     // all three runtimes unchanged. The app-scoped logger is keyed, so this bare spelling can only mean
     // the request-scoped one.
-    @Inject var logger: Logger
-    @Inject var session: Session<Manager>  // request-scoped, generic over the opaque store
+    @Inject let logger: Logger
+    @Inject let session: Session<Manager>  // request-scoped, generic over the opaque store
     // The app's opaque-lifted backend (`@Singleton(as: TodoRepository.self)`, `some TodoRepository`),
     // injected as a lifted generic parameter — the same portable shape `TodosController` uses. A
     // request-scoped controller *borrowing* the shared app backend is the idiomatic request-scope case.
-    @Inject var repository: Repository
+    @Inject let repository: Repository
 
     @Get
     @JSONResponse
@@ -163,7 +163,7 @@ public struct LoggedIn: Codable, Sendable, Equatable {
 // suite it is rebuilt per request to see the double. The guided diagnostic names this exact fix.
 @TestScopable
 public struct SessionController<Manager: SessionManager>: Sendable {
-    @Inject var manager: Manager
+    @Inject let manager: Manager
 
     /// Mint a token, persist it (the store records it on first sight), and hand it back as a cookie the
     /// browser will send on every subsequent request.
