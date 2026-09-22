@@ -1,3 +1,15 @@
+<p align="center">
+  <a href="https://github.com/swift-wire/wire-mvc-examples/actions/workflows/build.yml">
+    <img src="https://github.com/swift-wire/wire-mvc-examples/actions/workflows/build.yml/badge.svg" alt="Build">
+  </a>
+  <a href="https://codecov.io/gh/swift-wire/wire-mvc-examples">
+    <img src="https://codecov.io/gh/swift-wire/wire-mvc-examples/graph/badge.svg" alt="Code coverage">
+  </a>
+  <a href="https://www.apache.org/licenses/LICENSE-2.0">
+    <img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0">
+  </a>
+</p>
+
 # wire-mvc-examples
 
 Cross-runtime examples for [WireMVC](https://github.com/swift-wire/wire-mvc). The point of the
