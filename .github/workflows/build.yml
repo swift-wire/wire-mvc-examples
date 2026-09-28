@@ -35,6 +35,26 @@ jobs:
         working-directory: ${{ matrix.package }}
         run: swift test
 
+  # Optimised builds link differently from debug ones: a debug build compiles with testing enabled, which
+  # gives every internal symbol external visibility, so a reference from one module to another's internal
+  # symbol links there and fails only here. Nothing else in CI builds with optimisation, so this job is the
+  # only place that class shows up (swift-wire/wire-mvc#251). These packages are the framework's consumers,
+  # so a symbol that leaks out of wire-mvc or wire-open-api fails here even when those repos' own builds pass. Tests are not built: `@testable` would turn
+  # testing back on.
+  ReleaseBuild:
+    name: Release build / ${{ matrix.package }} / Swift 6.4 (pinned)
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [Controllers, HTMLForm, YAMLConfig, OpenAPISpec, HummingbirdExample, VaporExample, SwiftHttpServerExample]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: swift-wire/setup-swift@v1
+      - name: Build, optimised
+        working-directory: ${{ matrix.package }}
+        run: swift build -c release
+
   Integration:
     name: End-to-end / ${{ matrix.example }} (Docker) / Swift 6.4 (pinned)
     # Every runtime's integration test provisions a real datastore via swift-local-containers
