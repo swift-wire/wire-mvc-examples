@@ -32,7 +32,7 @@ let generatedPublicAPISettings: [SwiftSetting] = [
 
 let package = Package(
     name: "OpenAPISpec",
-    platforms: [.macOS(.v26)],
+    platforms: [.macOS(.v27)],
     products: [
         .library(name: "OpenAPISpec", targets: ["OpenAPISpec"])
     ],

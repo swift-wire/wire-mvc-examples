@@ -28,7 +28,7 @@ let proposalSettings: [SwiftSetting] = [
 
 let package = Package(
     name: "HTMLForm",
-    platforms: [.macOS(.v26)],
+    platforms: [.macOS(.v27)],
     products: [
         .library(name: "HTMLForm", targets: ["HTMLForm"])
     ],

@@ -10,7 +10,7 @@ import PackageDescription
 // tree stays isolated; the shared controllers arrive via a path dependency on ../Controllers, so this
 // compiles the *same* controller source as the proposal runtime — only the transport + backend differ.
 //
-// swift-tools-version 6.4 + deployment macOS 26 because proposal-native WireMVC requires them. The
+// swift-tools-version 6.4 + deployment macOS 27 because proposal-native WireMVC requires them. The
 // `ServerTransport` trait is enabled on the wire-mvc dependency to pull in the WireMVCServerTransport
 // adapter (and OpenAPIRuntime).
 //
@@ -20,7 +20,7 @@ import PackageDescription
 // HummingbirdTesting. Verification lives in the test target, not in `main`.
 let package = Package(
     name: "HummingbirdExample",
-    platforms: [.macOS(.v26)],
+    platforms: [.macOS(.v27)],
     dependencies: [
         .package(path: "../Controllers"),
         // 12-factor configuration, built once before the graph and passed in as a graph input.

@@ -29,7 +29,7 @@ let proposalSettings: [SwiftSetting] = [
 
 let package = Package(
     name: "YAMLConfig",
-    platforms: [.macOS(.v26)],
+    platforms: [.macOS(.v27)],
     products: [
         .library(name: "YAMLConfig", targets: ["YAMLConfig"])
     ],

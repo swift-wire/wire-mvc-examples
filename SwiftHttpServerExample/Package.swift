@@ -10,8 +10,9 @@ import PackageDescription
 // runtime), which freezes into the server's request handler. Structured like a real app — a
 // `buildApplication` assembly + a thin serving `@main`, with route verification in the test target.
 //
-// tools-version 6.4, deployment macOS 26 (so `anyAppleOS 26.0` is unconditional and Wire's ungated
-// generated graph compiles), and the experimental/upcoming-feature flags match the proposal stack.
+// tools-version 6.4, deployment macOS 27 (wire-mvc's floor, set by swift-http-server's `NIOHTTPServer`;
+// it also keeps `anyAppleOS 26.0` unconditional so Wire's ungated generated graph compiles), and the
+// experimental/upcoming-feature flags match the proposal stack.
 // The shared Controllers arrive via an in-repo path dependency (../Controllers), as in every runtime.
 let extraSettings: [SwiftSetting] = [
     .strictMemorySafety(),
@@ -28,7 +29,7 @@ let extraSettings: [SwiftSetting] = [
 
 let package = Package(
     name: "SwiftHttpServerExample",
-    platforms: [.macOS(.v26)],
+    platforms: [.macOS(.v27)],
     dependencies: [
         .package(path: "../Controllers"),
         // 12-factor configuration: one `ConfigReader` built before the graph and passed in as a graph
