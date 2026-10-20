@@ -10,7 +10,7 @@ import PackageDescription
 // tree stays isolated; the shared controllers arrive via a path dependency on ../Controllers, so this
 // compiles the *same* controller source as every other runtime — only the transport + backend differ.
 //
-// swift-tools-version 6.4 + deployment macOS 26 because proposal-native WireMVC requires them. The
+// swift-tools-version 6.4 + deployment macOS 27 because proposal-native WireMVC requires them. The
 // `ServerTransport` trait is enabled on the wire-mvc dependency to pull in the WireMVCServerTransport
 // adapter (and OpenAPIRuntime).
 //
@@ -20,7 +20,7 @@ import PackageDescription
 // route verification lives there, not in `main`. This is how `vapor new` scaffolds a project.
 let package = Package(
     name: "VaporExample",
-    platforms: [.macOS(.v26)],
+    platforms: [.macOS(.v27)],
     dependencies: [
         .package(path: "../Controllers"),
         // The `html-form` example. A sibling package because it depends on Elementary and `Controllers`

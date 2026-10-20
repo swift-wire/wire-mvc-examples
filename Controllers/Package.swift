@@ -9,10 +9,10 @@ import PackageDescription
 // WireMVC + Wire — no HTTP framework — so the *same* controller source compiles into each runtime's
 // isolated package; `@Controller`'s generated witnesses register onto a `HTTPServerRouteBuilder`.
 //
-// tools-version 6.4, deployment macOS 26, and the experimental/upcoming-feature flags match
+// tools-version 6.4, deployment macOS 27, and the experimental/upcoming-feature flags match
 // proposal-native WireMVC — the generated witnesses interface with the proposal's `~Copyable` /
-// `consuming sending` streaming types, and macOS 26 makes `anyAppleOS 26.0` unconditional so Wire's
-// ungated generated graph compiles.
+// `consuming sending` streaming types; macOS 27 is wire-mvc's floor (a package linking it must declare
+// at least that), and it keeps `anyAppleOS 26.0` unconditional so Wire's ungated generated graph compiles.
 let proposalSettings: [SwiftSetting] = [
     .strictMemorySafety(),
     .enableExperimentalFeature("SuppressedAssociatedTypesWithDefaults"),
@@ -28,7 +28,7 @@ let proposalSettings: [SwiftSetting] = [
 
 let package = Package(
     name: "Controllers",
-    platforms: [.macOS(.v26)],
+    platforms: [.macOS(.v27)],
     products: [
         .library(name: "Controllers", targets: ["Controllers"])
     ],

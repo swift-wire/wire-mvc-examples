@@ -101,21 +101,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Every package but `SwiftHttpServerExample`: it serves on NIOHTTPServer, and swift-http-server
-        # does not compile for the musl target on 6.4.0 (`NIOHTTPServer+HTTP1_1.swift` fails region
-        # isolation for aarch64-swift-linux-musl while building for glibc and macOS). Upstream's to fix;
-        # add it back here when it does.
-        package: [Controllers, HTMLForm, YAMLConfig, OpenAPISpec, HummingbirdExample, VaporExample]
+        # `SwiftHttpServerExample` was left out while it was held at swift-http-server b31b98d: on 6.4.0
+        # that revision's `NIOHTTPServer+HTTP1_1.swift` failed region isolation for
+        # aarch64-swift-linux-musl only (swiftlang/swift#92476, a false positive; glibc and macOS built).
+        # swift-http-server #138 works around it, and wire-mvc #256 cross-compiles its NIOHTTPServer
+        # fixture servers for this target on 6.4.1, so the example is back in the matrix.
+        package: [Controllers, HTMLForm, YAMLConfig, OpenAPISpec, HummingbirdExample, VaporExample, SwiftHttpServerExample]
     runs-on: ubuntu-24.04
     # The image and the SDK bundle must be the same Swift release: an SDK only installs against the
     # toolchain it was built for, so these two literals move together — and together with
     # `.swift-version`, since the cross-compile should check the toolchain the package is developed on.
     container:
-      image: swift:6.4.0-noble
+      image: swift:6.4.1-noble
     steps:
       - uses: actions/checkout@v6
       - name: Install Static Linux SDK
-        run: swift sdk install https://download.swift.org/swift-6.4.0-release/static-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz --checksum 47d2fd89eebfdf9eb4d536b6710414297f755c17926cdebc4742c08982b40a9e
+        run: swift sdk install https://download.swift.org/swift-6.4.1-release/static-sdk/swift-6.4.1-RELEASE/swift-6.4.1-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz --checksum cef5592d7430ed3c5ae1ddda479849c6f5252bd94a5723db1559f984caf38a7c
       - name: Cross-compile for ARM64 Linux
         working-directory: ${{ matrix.package }}
         run: swift build -c release --swift-sdk aarch64-swift-linux-musl
